@@ -43,6 +43,11 @@ async def image_candidates(session, project) -> list[tuple]:
                 (candidate, await router.build_image(candidate, settings))
             )
             seen.add(candidate.id)
+    # Provider fake hanya untuk mode kering: bila ada kandidat nyata, fake
+    # dibuang dari daftar agar kegagalan provider nyata tidak diam-diam
+    # menghasilkan gambar placeholder.
+    if any(provider.adapter != "fake" for provider, _a in ordered):
+        ordered = [pair for pair in ordered if pair[0].adapter != "fake"]
     return ordered
 
 

@@ -120,3 +120,20 @@ async def test_reconcile_enqueues_extras(factory):
             j.type for j in (await session.execute(select(GenerationJob))).scalars()
         }
         assert {"thumbnail", "metadata"} <= types
+
+
+def test_draw_title_text_changes_top_region():
+    import io
+
+    from PIL import Image
+
+    from app.services.thumbnail_text import draw_title_text
+
+    buf = io.BytesIO()
+    Image.new("RGB", (1080, 1920), (240, 235, 220)).save(buf, format="PNG")
+    out = draw_title_text(buf.getvalue(), "TURUN KELAS?!")
+    result = Image.open(io.BytesIO(out))
+    assert result.size == (1080, 1920)
+    top = result.crop((0, 80, 1080, 700))
+    colors = top.getcolors(maxcolors=1_000_000)
+    assert len(colors) > 2  # ada teks tergambar di wilayah atas

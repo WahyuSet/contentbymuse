@@ -23,8 +23,8 @@ def _short_title(title: str, max_words: int = 5) -> str:
 
 
 def build_thumbnail_prompt(style, hook_visual: str, title_text: str) -> str:
-    """Konsep thumbnail: digambar seluruhnya oleh AI termasuk teks judulnya
-    (keputusan pemilik 2026-10-22). Teks diberikan persis, Bahasa Indonesia."""
+    """Konsep thumbnail dari AI; teks judul dikomposit lokal sesudahnya karena
+    generator gambar menolak menggambar teks tertentu (cek integritas)."""
     parts = [
         style.style_text.rstrip(". ") + ".",
         f"Mascot anchor: {style.mascot_anchor}",
@@ -34,14 +34,12 @@ def build_thumbnail_prompt(style, hook_visual: str, title_text: str) -> str:
             "contrast against the background."
         ),
         (
-            f"Draw very large, bold, hand-lettered capital text across the top "
-            f'third of the image reading exactly: "{title_text}". The text must '
-            "be in Bahasa Indonesia, spelled exactly as given, thick strokes "
-            "with a dark outline. No other text anywhere in the image."
+            "Draw no text at all in the image. Leave the top third of the "
+            "frame as calm, uncluttered background space for a title."
         ),
         (
-            "Compose for a vertical 9:16 frame; keep the bottom quarter free "
-            "of important details."
+            "Compose for a vertical 9:16 frame; keep the bottom quarter "
+            "free of important details."
         ),
     ]
     return " ".join(parts)
@@ -88,6 +86,7 @@ async def run_thumbnail(job, factory: async_sessionmaker) -> dict:
                     "style": [style.id, style.version],
                     "title_text": title_text,
                     "hook_visual": hook_visual,
+                    "prompt": build_thumbnail_prompt(style, hook_visual, title_text),
                 },
                 sort_keys=True,
             ).encode()
@@ -140,6 +139,7 @@ async def run_thumbnail(job, factory: async_sessionmaker) -> dict:
             )
             normalized, original = normalize_to_portrait(result.image)
         except ProviderError as exc:
+            await ctx.log("warning", f"Provider {provider.name} gagal: {exc}")
             last_error = exc
             continue
         except ImageNormalizeError as exc:
@@ -153,12 +153,17 @@ async def run_thumbnail(job, factory: async_sessionmaker) -> dict:
         raise last_error or ScriptInputError("Provider gambar gagal.")
 
     provider, normalized, original = generated
+    from app.services.thumbnail_text import draw_title_text
+
+    final = draw_title_text(normalized, title_text)
     async with factory() as session:
         version = await asset_service.next_version(
             session, project_id=project.id, scene_id=None, kind="thumbnail"
         )
+    raw_key = f"assets/{project.id}/thumbnail-raw-v{version}.png"
+    await storage.put(raw_key, normalized, "image/png")
     key = f"assets/{project.id}/thumbnail-v{version}.png"
-    stored = await storage.put(key, normalized, "image/png")
+    stored = await storage.put(key, final, "image/png")
     async with factory() as session:
         asset = await asset_service.create_asset(
             session,
@@ -174,6 +179,7 @@ async def run_thumbnail(job, factory: async_sessionmaker) -> dict:
                 "render_id": render.id,
                 "prompt": prompt,
                 "title_text": title_text,
+                "raw_key": raw_key,
                 "original_size": list(original),
             },
             input_hash=digest,
