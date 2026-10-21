@@ -1,6 +1,9 @@
 # Fase 6 — Render: Rencana Implementasi
 
-> **DRAFT riset latar 2026-10-21 ~20:05 WIB — BELUM DISETUJUI pemilik.** Jangan eksekusi sebelum ada "gas Fase 6".
+> **DISETUJUI pemilik 2026-10-21 20:48 WIB ("gas Fase 6")** — draft riset latar 20:05 dijalankan dengan amendemen:
+> A1. AppSetting di kode yang ada adalah tabel key/value JSON, jadi `subtitle_style` disimpan sebagai baris kunci — **migrasi 0006 tidak diperlukan**; Task 1 menjadi bundling font + penanam/pengakses `subtitle_style` bawaan saja. Kolom project `voice_volume_db`/`bgm_asset_id` dari draft juga gugur: voice_volume adalah `app_setting` (§8.6) dan BGM di luar lingkup (Keputusan 6).
+> A2. Empat file render hidup di bawah satu baris aset `render` (kunci video.mp4) dengan `data.files` memuat keempat kunci + `data.encoder`/`duration_s`/`warnings`; file lain (srt/ass/thumbnail) tidak menjadi baris aset sendiri.
+> A3. Direktori ledger: `.superpowers/sdd/fase-6-render/`.
 > Untuk agen pelaksana: Wajib memakai sub-skill: gunakan superpowers:subagent-driven-development (disarankan) atau superpowers:executing-plans untuk menjalankan rencana ini per task. Langkah memakai kotak centang (`- [ ]`) untuk pelacakan. Gaya UI mengikuti antislop (identitas Fase 1-5) dan komentar kode mengikuti antislop-code.
 
 **Tujuan:** Dari script yang disetujui + aset suara & gambar terpilih per scene, hasilkan satu MP4 9:16 (1080×1920, 30fps) dengan subtitle bakar sinkron dari word timings + Ken Burns per scene + audio narasi concat yang di-loudnorm, plus file `.srt`/`.ass` dan thumbnail frame — menutup baris "Render" di spec (§4.9/§8). Render 100% lokal via FFmpeg (gratis, tanpa provider berbayar).
@@ -58,19 +61,18 @@ Smoke test `/tmp/render-smoke.py` memakai **aset nyata** project cicak Fase 5 (2
 
 ---
 
-### Task 1: Migrasi 0006 — settings render + subtitle style + bundling font
+### Task 1: Settings render (app_setting) + bundling font
 
 **File:**
 - Buat: `backend/app/assets/fonts/PlusJakartaSans-ExtraBold.ttf` (dibangkitkan via skrip `backend/scripts/bundle_font.py`: unduh variable OFL → instancer wght=800; URL + SHA tercatat di skrip)
-- Ubah: `backend/app/db/models.py` (+ `AppSetting.subtitle_style` JSON, `RenderSettings`-ish di project: `voice_volume_db` default 0, `bgm_asset_id` null)
-- Buat: `backend/alembic/versions/0006_render.py`
+- Buat: `backend/app/services/render_settings.py` (`get_subtitle_style(session)` membaca baris AppSetting `subtitle_style`, menanam bawaan bila belum ada)
 - Buat: `backend/tests/test_render_seed.py`
 
 **Antarmuka:**
 - `subtitle_style` default: `{font: "PlusJakartaSans-ExtraBold", size: 78, outline: 6, margin_v: 580, max_width_px: 940, max_chars: 28, emphasis_color: "#FFD84D"}`.
 - Skrip bundling idempoten: lewati bila TTF sudah ada dan valid (`usWeightClass==800`).
 
-- [ ] **Langkah 1: Tes** — migrasi naik/turun bersih; default subtitle_style valid; skrip bundling menghasilkan TTF 800 dari fixture variable font lokal (tanpa network di tes).
+- [ ] **Langkah 1: Tes** — get_subtitle_style menanam + mengembalikan bawaan yang valid dan idempoten; skrip bundling menghasilkan TTF 800 dari fixture variable font lokal (tanpa network di tes).
 - [ ] **Langkah 2: RED**.
 - [ ] **Langkah 3: Implementasi.**
 - [ ] **Langkah 4: Hijau.**
