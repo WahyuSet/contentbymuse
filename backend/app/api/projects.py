@@ -28,6 +28,7 @@ class ProjectOut(BaseModel):
     target_min_s: int
     target_max_s: int
     selected_idea_id: str | None
+    active_script_id: str | None = None
     settings: dict[str, Any]
     created_at: datetime
     updated_at: datetime
