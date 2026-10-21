@@ -15,7 +15,8 @@ export default function VoiceSettings({ project }: { project: Project }) {
   useEffect(() => {
     setProviderId(project.voice_provider_id ?? "");
     setVoiceId(project.voice_id ?? "");
-  }, [project.voice_provider_id, project.voice_id]);
+    setSpeed(String((project.voice_settings?.speed as number | undefined) ?? ""));
+  }, [project.voice_provider_id, project.voice_id, project.voice_settings]);
 
   const providers = useQuery({ queryKey: ["providers"], queryFn: fetchProviders });
   const voiceProviders = providers.data?.filter(
@@ -32,7 +33,12 @@ export default function VoiceSettings({ project }: { project: Project }) {
       patchProject(project.id, {
         voice_provider_id: providerId === "" ? null : providerId,
         voice_id: voiceId.trim() === "" ? null : voiceId.trim(),
-        voice_settings: { speed: speed.trim() === "" ? 100 : Number(speed) },
+        voice_settings: {
+          speed:
+            speed.trim() === ""
+              ? ((project.voice_settings?.speed as number | undefined) ?? 100)
+              : Number(speed),
+        },
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project", project.id] });

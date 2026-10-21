@@ -9,6 +9,14 @@ from app.providers.errors import ServerError
 DEFAULT_VOICE = "avocado_v2:MAI_03"
 
 
+def _fail(message: str, detail: str | None = None) -> ServerError:
+    # Kegagalan CLI lokal bersifat tetap (biner hilang / format salah):
+    # mengulanginya di mesin yang sama tidak akan mengubah hasil.
+    error = ServerError(message, detail=detail)
+    error.retryable = False
+    return error
+
+
 class MuseCliVoice:
     """TTS lewat CLI `tts` yang hanya ada di VM Muse (lihat ADJUSTMENTS.md)."""
 
@@ -41,7 +49,7 @@ class MuseCliVoice:
                     stderr=asyncio.subprocess.PIPE,
                 )
             except FileNotFoundError as exc:
-                raise ServerError(
+                raise _fail(
                     "CLI tts tidak ditemukan di mesin ini.", detail=str(exc)
                 ) from exc
             try:
@@ -51,9 +59,9 @@ class MuseCliVoice:
                 )
             except TimeoutError as exc:
                 process.kill()
-                raise ServerError("CLI tts melewati batas waktu.") from exc
+                raise _fail("CLI tts melewati batas waktu.") from exc
             if process.returncode != 0 or not out_path.exists():
-                raise ServerError(
+                raise _fail(
                     "CLI tts gagal membuat suara.",
                     detail=err.decode("utf-8", errors="replace")[:500],
                 )

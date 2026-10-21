@@ -98,31 +98,46 @@ async def _reconcile_voice_production(session, project) -> None:
     script = await session.get(Script, project.active_script_id)
     if script is None or script.status != "approved":
         return
-    expected = await ProviderRouter(session).expected_voice(project)
+    router = ProviderRouter(session)
+    expected = await router.expected_voice(project)
     if expected is None:
         return
     provider, voice_id = expected
-    adapter_cls = ADAPTERS.get(("voice", provider.adapter))
-    supports_context = bool(adapter_cls and adapter_cls.caps.supports_context)
+    # Klip sah bisa berasal dari kandidat fallback mana pun (rantai §5.3 di
+    # handler mencobanya berurutan); scene dianggap selesai bila hash klip
+    # terpilih cocok dengan digest salah satu kandidat, bukan hanya yang utama.
+    candidates: list[tuple] = [(provider, voice_id)]
+    if project.voice_provider_id is None:
+        for other in await router.candidates("voice"):
+            if other.id != provider.id:
+                candidates.append(
+                    (other, other.quirks.get("default_voice") or "default")
+                )
     scenes = await load_scenes(session, script.id)
     texts = {s.id: sanitize_tts_text(s.voiceover) for s in scenes}
     changed = False
     for index, scene in enumerate(scenes):
         previous_text = texts[scenes[index - 1].id] if index > 0 else None
         next_text = texts[scenes[index + 1].id] if index + 1 < len(scenes) else None
-        digest = asset_service.voice_input_hash(
-            text=texts[scene.id],
-            previous_text=previous_text if supports_context else None,
-            next_text=next_text if supports_context else None,
-            provider=provider.id,
-            model=provider.default_model,
-            voice=voice_id,
-            voice_settings=project.voice_settings or {},
-        )
+        digests = set()
+        for cand_provider, cand_voice in candidates:
+            cand_cls = ADAPTERS.get(("voice", cand_provider.adapter))
+            cand_context = bool(cand_cls and cand_cls.caps.supports_context)
+            digests.add(
+                asset_service.voice_input_hash(
+                    text=texts[scene.id],
+                    previous_text=previous_text if cand_context else None,
+                    next_text=next_text if cand_context else None,
+                    provider=cand_provider.id,
+                    model=cand_provider.default_model,
+                    voice=cand_voice,
+                    voice_settings=project.voice_settings or {},
+                )
+            )
         clip = await asset_service.selected_asset(
             session, project_id=project.id, scene_id=scene.id, kind="voice_clip"
         )
-        if clip is None or clip.input_hash != digest:
+        if clip is None or clip.input_hash not in digests:
             if not await _active_job_exists(session, scene_id=scene.id, type_="voice"):
                 # Indeks dedup aktif menjaga balapan cek-lalu-sisip; tabrakan jinak.
                 try:

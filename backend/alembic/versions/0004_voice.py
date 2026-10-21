@@ -19,7 +19,7 @@ def upgrade() -> None:
     op.add_column("project", sa.Column("voice_id", sa.String(length=128)))
     op.add_column(
         "project",
-        sa.Column("voice_settings", sa.JSON(), nullable=False, server_default="{}"),
+        sa.Column("voice_settings", sa.JSON(), server_default="{}"),
     )
     op.create_table(
         "asset",
@@ -54,6 +54,7 @@ def upgrade() -> None:
         ["project_id", sa.text("coalesce(scene_id, '')"), "kind"],
         unique=True,
         sqlite_where=sa.text("is_selected = 1"),
+        postgresql_where=sa.text("is_selected"),
     )
     op.create_table(
         "voice_calibration",

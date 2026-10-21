@@ -52,9 +52,11 @@ async def get_file(key: str, session: SessionDep):
         raise NotFoundError("File tidak ditemukan.") from None
     if not path.exists():
         raise NotFoundError("File tidak ditemukan.")
-    asset = (
+    matches = (
         await session.execute(select(Asset).where(Asset.storage_key == key))
-    ).scalars().first()
+    ).scalars().all()
+    # Baris word_timings berbagi storage_key klipnya; mime file adalah mime klip.
+    asset = next((a for a in matches if a.kind != "word_timings"), None)
     media_type = asset.mime if asset else "application/octet-stream"
     return StreamingResponse(storage.open(key), media_type=media_type)
 
