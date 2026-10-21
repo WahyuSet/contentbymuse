@@ -39,7 +39,8 @@ async def test_seed_creates_fake_and_env_router(session):
     assert isinstance(built, OpenAICompatibleLLM)
 
     all_providers = (await session.execute(select(Provider))).scalars().all()
-    assert len(all_providers) == 2
+    # Sejak Fase 4 seed juga menambah provider suara; yang diuji di sini baris LLM.
+    assert len([p for p in all_providers if p.capability == "llm"]) == 2
 
 
 async def test_seed_without_env_llm_only_fake(session):
