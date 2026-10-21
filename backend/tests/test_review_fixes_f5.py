@@ -169,7 +169,7 @@ async def test_seed_default_singularity(tmp_path):
     async with maker() as session:
         session.add(
             VisualStyle(
-                name="Klepon Klasik", style_text="x", negative_text="",
+                name="Tikus Klasik", style_text="x", negative_text="",
                 mascot_anchor="", image_params={}, is_default=False,
             )
         )

@@ -15,7 +15,7 @@ def test_output_contract_lists_fields_and_limits():
 async def test_sync_creates_templates_categories_formats(session):
     summary = await sync_prompts(session)
     await session.commit()
-    assert summary["categories"] == 5 and summary["formats"] == 3
+    assert summary["categories"] == 6 and summary["formats"] == 3
     again = await sync_prompts(session)
     assert again["versions"] == 0
 

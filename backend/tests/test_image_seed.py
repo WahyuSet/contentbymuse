@@ -45,7 +45,7 @@ async def test_default_visual_style_seeded_once(factory):
     style = styles[0]
     assert style.is_default is True
     assert style.reference_asset_id is None
-    assert "green" in style.mascot_anchor
+    assert "rat" in style.mascot_anchor and "red necktie" in style.mascot_anchor
     assert style.mascot_anchor.endswith(".")
 
 

@@ -18,7 +18,7 @@ export default function App() {
         <span className="mascot-head" aria-hidden="true" />
         <div>
           <h1>Stickman Content Factory</h1>
-          <p>Antrean produksi @SiKlepon-id — Fase 2: project dan ide.</p>
+          <p>Antrean produksi @TikusBerdasi — Fase 2: project dan ide.</p>
         </div>
       </header>
 

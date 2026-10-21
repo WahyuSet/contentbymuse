@@ -58,7 +58,7 @@ def test_create_project_with_category_marks_source_user(client):
 
 def test_categories_and_formats_listed(client):
     categories = client.get("/api/categories").json()
-    assert len(categories) == 5
+    assert len(categories) == 6
     health = next(c for c in categories if c["slug"] == "health")
     assert health["fact_check"] == "strict"
     formats = client.get("/api/formats").json()

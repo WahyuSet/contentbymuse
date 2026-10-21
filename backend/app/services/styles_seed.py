@@ -3,20 +3,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import VisualStyle
 
-DEFAULT_STYLE_NAME = "Klepon Klasik"
+DEFAULT_STYLE_NAME = "Tikus Klasik"
 
 _STYLE_TEXT = (
     "flat 2D hand-drawn doodle illustration, thin black ink outlines, "
     "muted colors on warm off-white paper texture, simple shapes, "
-    "lots of empty space, cozy Indonesian everyday-life mood"
+    "lots of empty space, wry Indonesian political-satire cartoon mood"
 )
 _MASCOT_ANCHOR = (
-    "Si Klepon, a stick figure mascot with a big round bright-green head, "
-    "a thin black stick body, and simple dot eyes with a cheerful expression."
+    "Tikus Berdasi, a cartoon grey rat with a long pointed snout, big round "
+    "ears, a long tail, and half-closed eyes with a smug sly grin, wearing "
+    "a black suit, a white shirt, and a bright red necktie."
 )
 _NEGATIVE_TEXT = (
     "photorealistic, 3d render, gradient shading, english text, watermark, "
-    "logo, blurry, cluttered background, extra limbs"
+    "logo, blurry, cluttered background, extra limbs, realistic human face, "
+    "likeness of a real person"
 )
 
 
