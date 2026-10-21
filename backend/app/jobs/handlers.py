@@ -46,11 +46,15 @@ async def run_provider_test(job, factory: async_sessionmaker) -> dict:
 
 from app.jobs.checks_fix import run_checks_fix
 from app.jobs.ideas import run_ideas
+from app.jobs.revise import run_revise
 from app.jobs.script import run_script
+from app.jobs.validate import run_validate
 
 HANDLERS = {
     "provider_test": run_provider_test,
     "ideas": run_ideas,
     "script": run_script,
     "checks_fix": run_checks_fix,
+    "validate": run_validate,
+    "revise": run_revise,
 }

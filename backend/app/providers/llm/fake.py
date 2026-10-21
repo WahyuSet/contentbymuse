@@ -149,10 +149,14 @@ class FakeLLM:
 
     async def generate_text(self, req: TextRequest, ctx=None) -> TextResult:
         joined = "\n".join(m.content for m in req.messages)
-        if '"score"' in joined and '"summary"' in joined and "schema_version" not in joined:
+        if "(pattern ^(PASS" in joined:
+            # Penanda kontrak ValidationOutput; JSON validator yang tertanam di
+            # prompt revise/fix tidak memuat pola ini, jadi tidak salah deteksi.
             payload = _validation_fixture()
         elif "schema_version" in joined:
             payload = _script_fixture(req.messages)
+        elif '"score"' in joined and '"summary"' in joined:
+            payload = _validation_fixture()
         elif "suggested_category" in joined:
             # Mode json_object tidak mengirim schema; kontrak di prompt adalah penandanya.
             payload = _ideas_fixture(req.messages)
