@@ -385,7 +385,9 @@ class VisualStyle(Base):
 class PublishRecord(Base):
     __tablename__ = "publish_record"
     __table_args__ = (
-        UniqueConstraint("project_id", "render_id", "platform"),
+        UniqueConstraint(
+            "project_id", "render_id", "platform", name="uq_publish_per_render"
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(26), primary_key=True, default=new_ulid)

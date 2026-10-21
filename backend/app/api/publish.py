@@ -2,12 +2,13 @@ import json
 
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.api.errors import AppError, NotFoundError
-from app.api.jobs import SessionDep
+from app.api.jobs import FactoryDep, SessionDep
 from app.config import get_settings
-from app.db.models import PublishRecord
+from app.db.models import Asset, PublishRecord
+from app.services.reconcile import reconcile
 from app.storage.local import LocalStorage
 
 router = APIRouter(prefix="/api", tags=["publish"])
@@ -52,18 +53,20 @@ async def list_awaiting(session: SessionDep):
     storage = LocalStorage(get_settings().storage_path)
     rows = (
         await session.execute(
-            select(PublishRecord).where(
-                PublishRecord.status == "awaiting_upload"
-            )
+            select(PublishRecord)
+            .where(PublishRecord.status == "awaiting_upload")
+            .order_by(PublishRecord.created_at)
         )
     ).scalars().all()
     out = []
     for record in rows:
         manifest = None
-        key = f"publish/{record.id}/manifest.json"
-        path = await storage.local_path(key)
+        path = await storage.local_path(f"publish/{record.id}/manifest.json")
         if path.exists():
-            manifest = json.loads(path.read_text())
+            try:
+                manifest = json.loads(path.read_text())
+            except (OSError, json.JSONDecodeError):
+                manifest = None  # satu manifest rusak tak boleh memblokir antrean
         out.append(
             {
                 "publish_id": record.id,
@@ -85,15 +88,63 @@ async def _load_record(session, record_id: str) -> PublishRecord:
 @router.post("/publish/{record_id}/claim", response_model=PublishOut)
 async def claim_publish(record_id: str, session: SessionDep):
     record = await _load_record(session, record_id)
-    if record.status != "awaiting_upload":
+    # Render basi tidak boleh naik: rekor harus milik render terpilih saat ini.
+    selected_render = (
+        await session.execute(
+            select(Asset.id).where(
+                Asset.project_id == record.project_id,
+                Asset.kind == "render",
+                Asset.is_selected.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if selected_render != record.render_id:
+        raise AppError(
+            409,
+            "PublishStale",
+            "Render rekor ini sudah digantikan render yang lebih baru.",
+        )
+    # Klaim atomik: UPDATE bersyarat status — dua eksekutor balapan tidak bisa
+    # sama-sama menang (yang kalah mendapat rowcount 0).
+    result = await session.execute(
+        update(PublishRecord)
+        .where(
+            PublishRecord.id == record_id,
+            PublishRecord.status == "awaiting_upload",
+        )
+        .values(status="uploading", attempts=PublishRecord.attempts + 1)
+    )
+    if result.rowcount != 1:
+        await session.rollback()
+        current = await _load_record(session, record_id)
         raise AppError(
             409,
             "PublishState",
-            f"Rekor berstatus {record.status}, bukan awaiting_upload.",
+            f"Rekor berstatus {current.status}, bukan awaiting_upload.",
         )
-    record.status = "uploading"
-    record.attempts += 1
     await session.commit()
+    await session.refresh(record)
+    return record
+
+
+@router.post("/publish/{record_id}/retry", response_model=PublishOut)
+async def retry_publish(
+    record_id: str, session: SessionDep, factory: FactoryDep
+):
+    """Jalan pemulihan rekor failed: kembali ke queued; reconcile mengantrekan
+    ulang job penyiapan paket (yang akan memvalidasi ulang dari nol)."""
+    record = await _load_record(session, record_id)
+    if record.status != "failed":
+        raise AppError(
+            409,
+            "PublishState",
+            f"Hanya rekor failed yang bisa dicoba lagi (status kini {record.status}).",
+        )
+    record.status = "queued"
+    record.error = None
+    project_id = record.project_id
+    await session.commit()
+    await reconcile(project_id, factory)
     await session.refresh(record)
     return record
 

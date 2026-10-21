@@ -169,6 +169,13 @@ def _api_client(tmp_path):
             await conn.run_sync(Base.metadata.create_all)
         maker = async_sessionmaker(engine, expire_on_commit=False)
         async with maker() as session:
+            session.add(Project(id="01JPROJECT", title="Proyek Uji", topic="uji"))
+            session.add(Asset(
+                id="01JRENDER", project_id="01JPROJECT", scene_id=None,
+                kind="render", storage_key="assets/x/video.mp4",
+                mime="video/mp4", input_hash="rh", is_selected=True,
+                version=1, data={},
+            ))
             record = PublishRecord(
                 project_id="01JPROJECT", render_id="01JRENDER",
                 platform="youtube", status="awaiting_upload",
@@ -203,3 +210,88 @@ def test_publish_api_claim_and_result(tmp_path):
     assert listed.json()[0]["status"] == "published"
     awaiting = client.get("/api/publish/awaiting")
     assert awaiting.json() == []
+
+
+def test_publish_api_claim_stale_render_rejected(tmp_path):
+    client, record_id = _api_client(tmp_path)
+
+    async def _swap_render():
+        engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path}/api.db")
+        maker = async_sessionmaker(engine, expire_on_commit=False)
+        async with maker() as session:
+            old = await session.get(Asset, "01JRENDER")
+            old.is_selected = False
+            session.add(Asset(
+                id="01JRENDER2", project_id="01JPROJECT", scene_id=None,
+                kind="render", storage_key="assets/x/video2.mp4",
+                mime="video/mp4", input_hash="rh2", is_selected=True,
+                version=2, data={},
+            ))
+            await session.commit()
+        await engine.dispose()
+
+    asyncio.run(_swap_render())
+    response = client.post(f"/api/publish/{record_id}/claim")
+    assert response.status_code == 409
+    assert response.json()["error"]["kind"] == "PublishStale"
+
+
+def test_publish_api_retry_failed_record(tmp_path):
+    client, record_id = _api_client(tmp_path)
+
+    async def _fail_record():
+        engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path}/api.db")
+        maker = async_sessionmaker(engine, expire_on_commit=False)
+        async with maker() as session:
+            record = await session.get(PublishRecord, record_id)
+            record.status = "failed"
+            record.error = "Platform sedang gangguan"
+            await session.commit()
+        await engine.dispose()
+
+    asyncio.run(_fail_record())
+    retried = client.post(f"/api/publish/{record_id}/retry")
+    assert retried.status_code == 200
+    assert retried.json()["status"] == "queued"
+    assert retried.json()["error"] is None
+    again = client.post(f"/api/publish/{record_id}/retry")
+    assert again.status_code == 409
+
+
+async def test_reconcile_supersedes_old_render_and_reaps_stale_upload(factory):
+    from datetime import UTC, datetime, timedelta
+
+    import app.jobs.handlers  # noqa: F401
+    from app.services.reconcile import reconcile
+
+    pid = await _arrange_reconcile(factory)
+    async with factory() as session:
+        records = (await session.execute(select(PublishRecord))).scalars().all()
+        yt = next(r for r in records if r.platform == "youtube")
+        fb = next(r for r in records if r.platform == "facebook")
+        yt.status = "awaiting_upload"
+        fb.status = "uploading"
+        fb.updated_at = datetime.now(UTC) - timedelta(hours=2)
+        render1 = (await session.execute(
+            select(Asset).where(Asset.kind == "render")
+        )).scalar_one()
+        render1.is_selected = False
+        render2 = Asset(project_id=pid, scene_id=None, kind="render",
+                        storage_key=render1.storage_key, mime="video/mp4",
+                        input_hash="rh2", is_selected=True, version=2,
+                        data={"files": {"video": render1.storage_key}})
+        session.add(render2)
+        metadata = (await session.execute(
+            select(Asset).where(Asset.kind == "metadata")
+        )).scalar_one()
+        await session.flush()
+        metadata.data = {**metadata.data, "render_id": render2.id}
+        await session.commit()
+        render2_id = render2.id
+    await reconcile(pid, factory)
+    async with factory() as session:
+        records = (await session.execute(select(PublishRecord))).scalars().all()
+        old = [r for r in records if r.render_id != render2_id]
+        new = [r for r in records if r.render_id == render2_id]
+        assert {r.status for r in old} == {"superseded"}
+        assert len(new) == 2

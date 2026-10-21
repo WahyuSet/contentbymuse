@@ -56,6 +56,11 @@ async def run_publish(job, factory: async_sessionmaker) -> dict:
             problems.append("Thumbnail belum tersedia.")
         elif not (await storage.local_path(thumbnail.storage_key)).exists():
             problems.append("Berkas thumbnail tidak ada di storage.")
+        elif (thumbnail.data or {}).get("render_id") not in (
+            None,
+            record.render_id,
+        ):
+            problems.append("Thumbnail dibuat untuk render yang berbeda.")
         if metadata is None:
             problems.append("Metadata belum tersedia.")
         else:
@@ -66,6 +71,8 @@ async def run_publish(job, factory: async_sessionmaker) -> dict:
                 project.active_script_id
             ):
                 problems.append("Metadata dibuat dari script yang bukan aktif.")
+            if not (mdata.get("title") or "").strip():
+                problems.append("Metadata tidak memiliki judul.")
         if problems:
             record.status = "failed"
             record.error = " ".join(problems)

@@ -146,6 +146,9 @@ async def _reconcile_extras(session, project) -> None:
 
 
 PUBLISH_MAX_JOBS_PER_RECORD = 3
+# Klaim upload yang tidak dilaporkan hasilnya dalam jangka ini dianggap
+# ditinggal eksekutor yang mati dan kembali menunggu upload.
+UPLOAD_LEASE_MINUTES = 30
 
 
 async def _reconcile_publish(session, project) -> None:
@@ -173,9 +176,41 @@ async def _reconcile_publish(session, project) -> None:
         ).scalar_one_or_none()
 
     render = await _selected("render")
+    if render is None:
+        return
+    from datetime import UTC, timedelta
+
+    from app.db.models import utcnow
+
+    now = utcnow()
+    changed = False
+    all_records = (
+        await session.execute(
+            select(PublishRecord).where(PublishRecord.project_id == project.id)
+        )
+    ).scalars().all()
+    for rec in all_records:
+        if rec.status == "uploading":
+            updated = rec.updated_at
+            if updated is not None and updated.tzinfo is None:
+                updated = updated.replace(tzinfo=UTC)
+            if updated is not None and updated < now - timedelta(
+                minutes=UPLOAD_LEASE_MINUTES
+            ):
+                rec.status = "awaiting_upload"
+                changed = True
+        if rec.render_id != render.id and rec.status in (
+            "queued",
+            "awaiting_upload",
+        ):
+            # Render yang lebih baru terpilih: paket render lama tak berlaku.
+            rec.status = "superseded"
+            changed = True
+    if changed:
+        await session.commit()
     thumbnail = await _selected("thumbnail")
     metadata = await _selected("metadata")
-    if render is None or thumbnail is None or metadata is None:
+    if thumbnail is None or metadata is None:
         return
     mdata = metadata.data or {}
     if mdata.get("render_id") != render.id:
@@ -236,6 +271,9 @@ async def _reconcile_publish(session, project) -> None:
                 )
         except IntegrityError:
             pass  # kembaran aktif dari balapan lain
+        # Commit per rekor: rollback enqueue_once pada rekor lain tidak boleh
+        # menyeret job rekor ini.
+        await session.commit()
     await session.commit()
 
 

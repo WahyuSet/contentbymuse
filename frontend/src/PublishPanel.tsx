@@ -1,5 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
-import { fetchPublish, type PublishRecord } from "./lib/publish";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  fetchPublish,
+  retryPublish,
+  type PublishRecord,
+} from "./lib/publish";
 
 const PLATFORM_LABELS: Record<string, string> = {
   youtube: "YouTube Shorts",
@@ -12,9 +16,16 @@ const STATUS_LABELS: Record<string, string> = {
   uploading: "Sedang diupload",
   published: "Terbit",
   failed: "Gagal",
+  superseded: "Digantikan render baru",
 };
 
-function PublishRow({ record }: { record: PublishRecord }) {
+function PublishRow({
+  record,
+  onRetry,
+}: {
+  record: PublishRecord;
+  onRetry: (id: string) => void;
+}) {
   return (
     <li>
       <strong>{PLATFORM_LABELS[record.platform] ?? record.platform}</strong>
@@ -31,11 +42,22 @@ function PublishRow({ record }: { record: PublishRecord }) {
       {record.status === "failed" && record.error && (
         <p className="error-text">{record.error}</p>
       )}
+      {record.status === "failed" && (
+        <button type="button" onClick={() => onRetry(record.id)}>
+          Coba lagi
+        </button>
+      )}
     </li>
   );
 }
 
 export default function PublishPanel({ projectId }: { projectId: string }) {
+  const queryClient = useQueryClient();
+  const retry = useMutation({
+    mutationFn: retryPublish,
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["publish", projectId] }),
+  });
   const publish = useQuery({
     queryKey: ["publish", projectId],
     queryFn: () => fetchPublish(projectId),
@@ -48,7 +70,11 @@ export default function PublishPanel({ projectId }: { projectId: string }) {
       <h3>Publish</h3>
       <ul className="publish-list">
         {records.map((record) => (
-          <PublishRow key={record.id} record={record} />
+          <PublishRow
+            key={record.id}
+            record={record}
+            onRetry={(id) => retry.mutate(id)}
+          />
         ))}
       </ul>
     </section>
