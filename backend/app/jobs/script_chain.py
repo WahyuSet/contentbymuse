@@ -92,9 +92,10 @@ async def save_draft(
     )
     session.add(script)
     await session.flush()
+    wps = await calibrated_wps(session, project)
     total = 0.0
     for position, scene in enumerate(draft.scenes, start=1):
-        est = estimate_scene_s(scene.voiceover, WPS_DEFAULT)
+        est = estimate_scene_s(scene.voiceover, wps)
         total += est
         session.add(
             Scene(
@@ -142,11 +143,27 @@ def issues_payload(issues) -> list[dict]:
     return [dataclasses.asdict(issue) for issue in issues]
 
 
+async def calibrated_wps(session: AsyncSession, project: Project) -> float:
+    """wps dari kalibrasi suara project (Spec §4.3); belum ada sampel -> bawaan."""
+    from app.db.models import VoiceCalibration
+    from app.providers.router import ProviderRouter
+
+    expected = await ProviderRouter(session).expected_voice(project)
+    if expected is None:
+        return WPS_DEFAULT
+    provider, voice_id = expected
+    row = await session.get(VoiceCalibration, (provider.id, voice_id))
+    if row is None or row.samples == 0:
+        return WPS_DEFAULT
+    return row.words_per_second
+
+
 async def checks_for(session: AsyncSession, project: Project, script: Script) -> list:
     scenes = await load_scenes(session, script.id)
     fmt = await session.get(Format, project.format_id) if project.format_id else None
     return run_checks(
         scenes,
+        wps=await calibrated_wps(session, project),
         target_min_s=project.target_min_s,
         target_max_s=project.target_max_s,
         format_slug=fmt.slug if fmt else None,

@@ -462,13 +462,16 @@ async def _renumber(session: AsyncSession, scenes: list) -> None:
     await session.flush()
 
 
-async def _recount(session: AsyncSession, script: Script, scenes: list) -> None:
+async def _recount(
+    session: AsyncSession, script: Script, scenes: list, project: Project
+) -> None:
     from app.domain.script_rules import estimate_scene_s
-    from app.jobs.script_chain import WPS_DEFAULT
+    from app.jobs.script_chain import calibrated_wps
 
+    wps = await calibrated_wps(session, project)
     total = 0.0
     for scene in scenes:
-        scene.est_duration_s = estimate_scene_s(scene.voiceover, WPS_DEFAULT)
+        scene.est_duration_s = estimate_scene_s(scene.voiceover, wps)
         total += scene.est_duration_s
     script.estimated_duration_s = total
     script.hook = scenes[0].voiceover if scenes else ""
@@ -504,7 +507,7 @@ async def patch_scene(scene_id: str, body: ScenePatch, session: SessionDep):
     if script.status in ("validated", "approved"):
         script.edited_after_validation = True
     scenes = await load_scenes(session, script.id)
-    await _recount(session, script, scenes)
+    await _recount(session, script, scenes, project)
     await session.commit()
     await session.refresh(scene)
     issues = await checks_for(session, project, script)
@@ -518,7 +521,7 @@ async def create_scene(script_id: str, body: SceneCreate, session: SessionDep):
     from app.jobs.script_chain import WPS_DEFAULT
 
     script = await _load_script(session, script_id)
-    await _editable_guard(session, script)
+    project = await _editable_guard(session, script)
     _validate_scene_enums(body.model_dump())
     scenes = await load_scenes(session, script.id)
     insert_at = (
@@ -544,7 +547,7 @@ async def create_scene(script_id: str, body: SceneCreate, session: SessionDep):
     await _renumber(session, ordered)
     if script.status in ("validated", "approved"):
         script.edited_after_validation = True
-    await _recount(session, script, ordered)
+    await _recount(session, script, ordered, project)
     await session.commit()
     await session.refresh(scene)
     return SceneOut.model_validate(scene)
@@ -558,14 +561,14 @@ async def delete_scene(scene_id: str, session: SessionDep):
     if scene is None:
         raise NotFoundError("Scene tidak ditemukan.")
     script = await _load_script(session, scene.script_id)
-    await _editable_guard(session, script)
+    project = await _editable_guard(session, script)
     await session.delete(scene)
     await session.flush()
     scenes = await load_scenes(session, script.id)
     await _renumber(session, scenes)
     if script.status in ("validated", "approved"):
         script.edited_after_validation = True
-    await _recount(session, script, scenes)
+    await _recount(session, script, scenes, project)
     await session.commit()
     return {"deleted": scene_id}
 
@@ -573,7 +576,7 @@ async def delete_scene(scene_id: str, session: SessionDep):
 @router.post("/scripts/{script_id}/scenes/reorder", response_model=ScriptDetailOut)
 async def reorder_scenes(script_id: str, body: ReorderIn, session: SessionDep):
     script = await _load_script(session, script_id)
-    await _editable_guard(session, script)
+    project = await _editable_guard(session, script)
     scenes = await load_scenes(session, script.id)
     by_id = {scene.id: scene for scene in scenes}
     if len(body.scene_ids) != len(scenes) or set(body.scene_ids) != set(by_id):
@@ -586,7 +589,7 @@ async def reorder_scenes(script_id: str, body: ReorderIn, session: SessionDep):
     await _renumber(session, ordered)
     if script.status in ("validated", "approved"):
         script.edited_after_validation = True
-    await _recount(session, script, ordered)
+    await _recount(session, script, ordered, project)
     await session.commit()
     await session.refresh(script)
     return await script_detail(session, script)
