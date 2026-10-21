@@ -26,4 +26,58 @@ class IdeasOutput(BaseModel):
     ideas: list[IdeaItem] = Field(description="Tepat 8 ide")
 
 
-OUTPUT_MODELS: dict[str, type[BaseModel]] = {"IdeasOutput": IdeasOutput}
+class SceneDraft(BaseModel):
+    beat: str = Field(
+        pattern="^(hook|setup|main|payoff|cta|loop)$",
+        description="Peran scene dalam alur: hook, setup, main, payoff, cta, loop",
+    )
+    voiceover: str = Field(description="Narasi lisan Bahasa Indonesia, 3 sampai 16 kata")
+    subtitle: str | None = Field(default=None, description="Teks subtitle bila berbeda dari voiceover")
+    visual_prompt: str = Field(description="Prompt gambar dalam Bahasa Inggris, satu adegan visual")
+    include_mascot: bool = Field(default=True, description="True bila maskot stickman berkepala hijau tampil")
+    visual_type: str = Field(
+        pattern="^(character|object|process|environment|diagram|closeup)$",
+        description="Jenis visual utama scene",
+    )
+    transition: str = Field(
+        default="cut",
+        pattern="^(cut|crossfade|punch_in)$",
+        description="Transisi masuk ke scene ini",
+    )
+    emphasis_words: list[str] = Field(
+        default_factory=list, description="Kata dari voiceover yang disorot di subtitle"
+    )
+
+
+class ScriptDraft(BaseModel):
+    schema_version: str = Field(default="script.v1", description="Selalu script.v1")
+    title: str = Field(description="Judul video")
+    hook: str = Field(description="Sama persis dengan voiceover scene pertama")
+    scenes: list[SceneDraft] = Field(description="8 sampai 14 scene berurutan")
+    claims_to_verify: list[str] = Field(
+        default_factory=list, description="Klaim fakta yang harus dicek pemilik sebelum menyetujui"
+    )
+
+
+class ValidationIssue(BaseModel):
+    severity: str = Field(pattern="^(error|warning|suggestion)$")
+    area: str = Field(description="content, script, scenes, voiceover, atau platform")
+    scene_position: int | None = None
+    message: str
+    suggestion: str | None = None
+    needs_change: bool = True
+
+
+class ValidationOutput(BaseModel):
+    status: str = Field(pattern="^(PASS|NEEDS_REVISION|FAIL)$")
+    score: int = Field(ge=0, le=100)
+    summary: str
+    issues: list[ValidationIssue] = Field(default_factory=list)
+    claims_to_verify: list[str] = Field(default_factory=list)
+
+
+OUTPUT_MODELS: dict[str, type[BaseModel]] = {
+    "IdeasOutput": IdeasOutput,
+    "ScriptDraft": ScriptDraft,
+    "ValidationOutput": ValidationOutput,
+}

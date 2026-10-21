@@ -209,6 +209,7 @@ class Project(Base):
     target_min_s: Mapped[int] = mapped_column(Integer, default=30)
     target_max_s: Mapped[int] = mapped_column(Integer, default=40)
     selected_idea_id: Mapped[str | None] = mapped_column(String(26))
+    active_script_id: Mapped[str | None] = mapped_column(String(26))
     settings: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -233,3 +234,75 @@ class ContentIdea(Base):
     fact_note: Mapped[str | None] = mapped_column(Text)
     job_id: Mapped[str] = mapped_column(String(26), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Script(Base):
+    __tablename__ = "script"
+    __table_args__ = (UniqueConstraint("project_id", "version"),)
+
+    id: Mapped[str] = mapped_column(String(26), primary_key=True, default=new_ulid)
+    project_id: Mapped[str] = mapped_column(ForeignKey("project.id"), index=True)
+    idea_id: Mapped[str | None] = mapped_column(String(26))
+    version: Mapped[int] = mapped_column(Integer)
+    parent_id: Mapped[str | None] = mapped_column(String(26))
+    source: Mapped[str] = mapped_column(String(16), default="generated")
+    schema_version: Mapped[str] = mapped_column(String(16), default="script.v1")
+    title: Mapped[str] = mapped_column(String(255))
+    hook: Mapped[str] = mapped_column(Text, default="")
+    estimated_duration_s: Mapped[float] = mapped_column(default=0.0)
+    claims_to_verify: Mapped[list] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(16), default="draft")
+    edited_after_validation: Mapped[bool] = mapped_column(Boolean, default=False)
+    best_score: Mapped[int | None] = mapped_column(Integer)
+    prompt_version_id: Mapped[str | None] = mapped_column(String(26))
+    job_id: Mapped[str | None] = mapped_column(String(26), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class Scene(Base):
+    __tablename__ = "scene"
+    __table_args__ = (UniqueConstraint("script_id", "position"),)
+
+    id: Mapped[str] = mapped_column(String(26), primary_key=True, default=new_ulid)
+    script_id: Mapped[str] = mapped_column(ForeignKey("script.id"), index=True)
+    position: Mapped[int] = mapped_column(Integer)
+    beat: Mapped[str] = mapped_column(String(16), default="main")
+    voiceover: Mapped[str] = mapped_column(Text, default="")
+    subtitle_override: Mapped[str | None] = mapped_column(Text)
+    visual_prompt: Mapped[str] = mapped_column(Text, default="")
+    include_mascot: Mapped[bool] = mapped_column(Boolean, default=True)
+    visual_type: Mapped[str] = mapped_column(String(16), default="character")
+    transition: Mapped[str] = mapped_column(String(16), default="cut")
+    emphasis_words: Mapped[list] = mapped_column(JSON, default=list)
+    est_duration_s: Mapped[float] = mapped_column(default=0.0)
+    revision: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class ValidationResult(Base):
+    __tablename__ = "validation_result"
+
+    id: Mapped[str] = mapped_column(String(26), primary_key=True, default=new_ulid)
+    script_id: Mapped[str] = mapped_column(ForeignKey("script.id"), index=True)
+    attempt: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(16))
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    issues: Mapped[list] = mapped_column(JSON, default=list)
+    claims_to_verify: Mapped[list] = mapped_column(JSON, default=list)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    prompt_version_id: Mapped[str | None] = mapped_column(String(26))
+    job_id: Mapped[str | None] = mapped_column(String(26), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AppSetting(Base):
+    __tablename__ = "app_setting"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[object] = mapped_column(JSON)
