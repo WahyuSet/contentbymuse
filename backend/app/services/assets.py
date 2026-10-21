@@ -104,6 +104,27 @@ def voice_input_hash(
     )
 
 
+def image_input_hash(
+    *,
+    prompt: str,
+    negative_text: str | None,
+    provider: str,
+    model: str | None,
+    params: dict,
+    reference_hash: str | None,
+) -> str:
+    return sha256_of_json(
+        {
+            "prompt": prompt,
+            "negative_text": negative_text,
+            "provider": provider,
+            "model": model,
+            "params": params,
+            "reference_hash": reference_hash,
+        }
+    )
+
+
 def timings_input_hash(*, clip_input_hash: str, text: str, method: str) -> str:
     return sha256_of_json(
         {"clip_input_hash": clip_input_hash, "text": text, "method": method}
