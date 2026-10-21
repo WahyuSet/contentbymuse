@@ -1,3 +1,5 @@
+import shutil
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,6 +51,29 @@ async def seed_providers(session: AsyncSession, settings: Settings) -> None:
                 quirks=dict(ROUTER_LLM_QUIRKS),
                 enabled=True,
                 priority=10,
+            )
+        )
+    if await _find(session, "Suara Fake (dry-run)") is None:
+        session.add(
+            Provider(
+                name="Suara Fake (dry-run)",
+                capability="voice",
+                adapter="fake",
+                quirks={"default_voice": "fake-1"},
+                enabled=True,
+                priority=100,
+            )
+        )
+    # Adapter muse_cli hanya berguna di VM Muse tempat CLI tts tersedia.
+    if shutil.which("tts") and await _find(session, "Suara Muse (CLI)") is None:
+        session.add(
+            Provider(
+                name="Suara Muse (CLI)",
+                capability="voice",
+                adapter="muse_cli",
+                quirks={"default_voice": "avocado_v2:MAI_03"},
+                enabled=True,
+                priority=20,
             )
         )
     await session.flush()

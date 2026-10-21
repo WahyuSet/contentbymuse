@@ -47,6 +47,12 @@ class TextResult:
 
 
 @dataclass
+class VoiceInfo:
+    id: str
+    name: str
+
+
+@dataclass
 class VoiceRequest:
     text: str
     voice_id: str
@@ -54,6 +60,7 @@ class VoiceRequest:
     language: str = "id-ID"
     previous_text: str | None = None
     next_text: str | None = None
+    voice_settings: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

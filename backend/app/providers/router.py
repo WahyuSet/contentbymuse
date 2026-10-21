@@ -38,3 +38,27 @@ class ProviderRouter:
             default_model=provider.default_model,
             quirks=provider.quirks,
         )
+
+    async def build_voice(self, provider: Provider, settings: Settings):
+        adapter_cls = ADAPTERS.get(("voice", provider.adapter))
+        if adapter_cls is None:
+            raise LookupError(f"Adapter suara '{provider.adapter}' tidak dikenal.")
+        if provider.adapter == "fake":
+            return adapter_cls()
+        return adapter_cls(quirks=provider.quirks)
+
+    async def expected_voice(self, project) -> tuple[Provider, str] | None:
+        """Suara produksi project (Spec §4.3): pin project menang; tanpa pin,
+        kandidat suara teratas router beserta suara bawaannya."""
+        pinned = None
+        if project.voice_provider_id:
+            pinned = await self._session.get(Provider, project.voice_provider_id)
+        if pinned is not None and pinned.capability == "voice" and pinned.enabled:
+            return pinned, project.voice_id or pinned.quirks.get(
+                "default_voice"
+            ) or "default"
+        candidates = await self.candidates("voice")
+        if not candidates:
+            return None
+        top = candidates[0]
+        return top, top.quirks.get("default_voice") or "default"

@@ -2,7 +2,14 @@ import io
 import math
 import wave
 
-from app.providers.base import Usage, VoiceCaps, VoiceRequest, VoiceResult, WordTiming
+from app.providers.base import (
+    Usage,
+    VoiceCaps,
+    VoiceInfo,
+    VoiceRequest,
+    VoiceResult,
+    WordTiming,
+)
 
 _SAMPLE_RATE = 8000
 _WORDS_PER_SECOND = 2.5
@@ -10,6 +17,9 @@ _WORDS_PER_SECOND = 2.5
 
 class FakeVoice:
     caps = VoiceCaps(returns_timestamps=True)
+
+    async def list_voices(self) -> list[VoiceInfo]:
+        return [VoiceInfo(id="fake-1", name="Suara Fake (2,5 kata/detik)")]
 
     async def synthesize(self, req: VoiceRequest, ctx=None) -> VoiceResult:
         words = req.text.split()
