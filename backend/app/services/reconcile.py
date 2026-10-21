@@ -54,6 +54,7 @@ async def reconcile(project_id: str | None, factory: async_sessionmaker | None =
             await _reconcile_voice_production(session, project)
             await _reconcile_image_production(session, project)
             await _reconcile_render(session, project)
+            await _reconcile_extras(session, project)
             return
         _job, created = await enqueue_once(
             session,
@@ -79,6 +80,32 @@ async def _active_job_exists(session, *, scene_id: str, type_: str) -> bool:
         )
     ).first()
     return row is not None
+
+
+async def _reconcile_extras(session, project) -> None:
+    """Setelah render terpilih ada: antrekan thumbnail + metadata untuk render
+    itu (enqueue_once terdedup oleh input render_id)."""
+    from app.db.models import Asset
+    from app.jobs.queue import enqueue_once
+
+    render = (
+        await session.execute(
+            select(Asset).where(
+                Asset.project_id == project.id,
+                Asset.kind == "render",
+                Asset.is_selected.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if render is None:
+        return
+    for job_type in ("thumbnail", "metadata"):
+        await enqueue_once(
+            session,
+            type=job_type,
+            input={"render_id": render.id},
+            project_id=project.id,
+        )
 
 
 async def _reconcile_render(session, project) -> None:

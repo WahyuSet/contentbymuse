@@ -110,7 +110,7 @@ def build_ffmpeg_command(
         mix_labels = ["[acat]"]
         base_index = len(plan.scenes) * 2
         for k, event in enumerate(plan.sfx_events):
-            delay_ms = int(round(event.at_s * 1000))
+            delay_ms = round(event.at_s * 1000)
             filters.append(
                 f"[{base_index + k}:a]aformat=sample_rates=48000:"
                 f"channel_layouts=stereo,adelay={delay_ms}|{delay_ms},"

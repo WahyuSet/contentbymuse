@@ -37,7 +37,7 @@ def _minimal_dict(schema: type[BaseModel]) -> dict:
 def _topic_core(messages) -> str:
     for message in messages:
         for line in message.content.splitlines():
-            if line.strip().lower().startswith("topik:"):
+            if line.strip().lower().startswith(("topik:", "judul project:")):
                 topic = line.split(":", 1)[1].strip().rstrip(".")
                 topic = _QUESTION_LEAD.sub("", topic)
                 words = topic.split()
@@ -134,6 +134,20 @@ def _script_fixture(messages: list[Message]) -> dict:
     }
 
 
+def _metadata_fixture(messages) -> dict:
+    core = _topic_core(messages)
+    cap = core[:1].upper() + core[1:]
+    return {
+        "title": f"{cap} — Penonton Wajib Tahu!",
+        "description": (
+            f"Video ini membahas {core} dengan bahasa sederhana. "
+            "Menurut kamu, bagian mana yang paling mengejutkan? Tulis di komentar!"
+        ),
+        "hashtags": ["tikusberdasi", "shorts", "berita"],
+        "fb_caption": f"{cap}! Simak sampai habis. #tikusberdasi #shorts",
+    }
+
+
 def _validation_fixture() -> dict:
     return {
         "status": "PASS",
@@ -157,6 +171,8 @@ class FakeLLM:
             payload = _script_fixture(req.messages)
         elif '"score"' in joined and '"summary"' in joined:
             payload = _validation_fixture()
+        elif "fb_caption" in joined:
+            payload = _metadata_fixture(req.messages)
         elif "suggested_category" in joined:
             # Mode json_object tidak mengirim schema; kontrak di prompt adalah penandanya.
             payload = _ideas_fixture(req.messages)

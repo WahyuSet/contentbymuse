@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchJobs } from "./lib/jobs";
-import { fetchRender, requestRender } from "./lib/render";
+import {
+  fetchMetadata,
+  fetchRender,
+  fetchThumbnail,
+  requestRender,
+} from "./lib/render";
 
 const FILE_LABELS: Record<string, string> = {
   video: "video.mp4",
@@ -15,6 +20,16 @@ export default function RenderPanel({ projectId }: { projectId: string }) {
     queryKey: ["render", projectId],
     queryFn: () => fetchRender(projectId),
     refetchInterval: 2000,
+  });
+  const thumbnail = useQuery({
+    queryKey: ["thumbnail", projectId],
+    queryFn: () => fetchThumbnail(projectId),
+    refetchInterval: 5000,
+  });
+  const metadata = useQuery({
+    queryKey: ["metadata", projectId],
+    queryFn: () => fetchMetadata(projectId),
+    refetchInterval: 5000,
   });
   const jobs = useQuery({
     queryKey: ["jobs"],
@@ -83,6 +98,28 @@ export default function RenderPanel({ projectId }: { projectId: string }) {
               </a>
             ))}
           </div>
+          {thumbnail.data && (
+            <>
+              <h4>Thumbnail AI</h4>
+              <img
+                className="render-thumb"
+                src={thumbnail.data.url}
+                alt={thumbnail.data.title_text ?? "Thumbnail"}
+              />
+            </>
+          )}
+          {metadata.data?.title && (
+            <>
+              <h4>Metadata publish</h4>
+              <p className="panel-note">
+                <strong>{metadata.data.title}</strong>
+              </p>
+              <p className="panel-note">{metadata.data.description}</p>
+              <p className="panel-note">
+                {(metadata.data.hashtags ?? []).map((tag) => `#${tag}`).join(" ")}
+              </p>
+            </>
+          )}
         </>
       ) : (
         <p className="panel-note">

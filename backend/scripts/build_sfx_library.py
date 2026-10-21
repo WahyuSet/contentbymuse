@@ -25,8 +25,10 @@ RECIPES: dict[str, tuple[list[str], str]] = {
     # Desis transisi: derau pita dengan amplop naik-turun.
     "whoosh": (
         [f"anoisesrc=color=white:duration=0.45:sample_rate={SR}"],
-        "bandpass=f=900:width_type=h:w=1.2,"
-        "aeval=val(0)*sin(3.14159*t/0.45):c=same,apad=whole_dur=0.45",
+        (
+            "bandpass=f=900:width_type=h:w=1.2,"
+            "aeval=val(0)*sin(3.14159*t/0.45):c=same,apad=whole_dur=0.45"
+        ),
     ),
     # Letupan pendek.
     "pop": (
@@ -35,8 +37,12 @@ RECIPES: dict[str, tuple[list[str], str]] = {
     ),
     # Denting koin: dua nada tinggi cepat.
     "cash": (
-        [f"aevalsrc=(sin(2*PI*2093*t)*exp(-9*t)"
-         f"+0.7*sin(2*PI*2637*t)*exp(-11*t)):s={SR}:d=0.35"],
+        [
+            (
+                f"aevalsrc=(sin(2*PI*2093*t)*exp(-9*t)"
+                f"+0.7*sin(2*PI*2637*t)*exp(-11*t)):s={SR}:d=0.35"
+            )
+        ],
         "apad=whole_dur=0.35",
     ),
     # Meluncur turun (komedi jatuh/anjlok): sapuan 800 -> 250 Hz.
@@ -52,8 +58,10 @@ RECIPES: dict[str, tuple[list[str], str]] = {
     # Gesekan piringan (record scratch) untuk kejutan.
     "scratch": (
         [f"anoisesrc=color=pink:duration=0.4:sample_rate={SR}"],
-        "highpass=f=1200,aeval=val(0)*(0.4+0.6*sin(50*t))*exp(-3*t):c=same,"
-        "apad=whole_dur=0.4",
+        (
+            "highpass=f=1200,aeval=val(0)*(0.4+0.6*sin(50*t))*exp(-3*t):c=same,"
+            "apad=whole_dur=0.4"
+        ),
     ),
     # Kilau naik untuk momen positif: sapuan 1200 -> 1800 Hz.
     "sparkle": (

@@ -141,7 +141,7 @@ def test_plan_sfx_events_from_cues_and_transitions():
     kinds = [(e.kind, e.sfx_id) for e in plan.sfx_events]
     assert ("cue", "fall") in kinds
     assert ("transition", "whoosh") in kinds
-    ding = [e for e in plan.sfx_events if e.sfx_id == "ding"][0]
+    ding = next(e for e in plan.sfx_events if e.sfx_id == "ding")
     assert ding.at_s >= plan.scenes[1].start_s - 0.01  # kata tak ketemu -> awal scene
-    fall = [e for e in plan.sfx_events if e.sfx_id == "fall"][0]
+    fall = next(e for e in plan.sfx_events if e.sfx_id == "fall")
     assert 0.7 < fall.at_s < 0.9  # kata ke-3 pada 0.4 dtk/kata

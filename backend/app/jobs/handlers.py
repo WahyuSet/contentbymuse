@@ -48,9 +48,11 @@ from app.jobs.align import run_align
 from app.jobs.checks_fix import run_checks_fix
 from app.jobs.ideas import run_ideas
 from app.jobs.image import run_image
+from app.jobs.metadata import run_metadata
 from app.jobs.render import run_render_job
 from app.jobs.revise import run_revise
 from app.jobs.script import run_script
+from app.jobs.thumbnail import run_thumbnail
 from app.jobs.validate import run_validate
 from app.jobs.voice import run_voice
 
@@ -65,4 +67,6 @@ HANDLERS = {
     "align": run_align,
     "image": run_image,
     "render": run_render_job,
+    "thumbnail": run_thumbnail,
+    "metadata": run_metadata,
 }

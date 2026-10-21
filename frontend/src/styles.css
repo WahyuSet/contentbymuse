@@ -551,3 +551,9 @@ code {
   background: #1e9e4a;
   transition: width 1s linear;
 }
+
+.render-thumb {
+  width: 180px;
+  border: 1px solid #d8d2c4;
+  border-radius: 8px;
+}

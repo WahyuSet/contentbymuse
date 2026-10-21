@@ -88,8 +88,16 @@ class ValidationOutput(BaseModel):
     claims_to_verify: list[str] = Field(default_factory=list)
 
 
+class MetadataOutput(BaseModel):
+    title: str = Field(min_length=10, max_length=100, description="Judul publish, maksimal 70 karakter idealnya")
+    description: str = Field(description="Deskripsi video 2-3 kalimat + pertanyaan pemancing komentar")
+    hashtags: list[str] = Field(description="3-6 tagar tanpa tanda pagar")
+    fb_caption: str = Field(description="Caption Facebook Reels yang lebih pendek dan menohok")
+
+
 OUTPUT_MODELS: dict[str, type[BaseModel]] = {
     "IdeasOutput": IdeasOutput,
     "ScriptDraft": ScriptDraft,
     "ValidationOutput": ValidationOutput,
+    "MetadataOutput": MetadataOutput,
 }

@@ -348,6 +348,52 @@ async def get_render(project_id: str, session: SessionDep):
     )
 
 
+@router.get("/projects/{project_id}/thumbnail")
+async def get_thumbnail(project_id: str, session: SessionDep):
+    from app.db.models import Asset
+
+    asset = (
+        await session.execute(
+            select(Asset).where(
+                Asset.project_id == project_id,
+                Asset.kind == "thumbnail",
+                Asset.is_selected.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if asset is None:
+        return None
+    return {
+        "version": asset.version,
+        "url": f"/api/files/{asset.storage_key}",
+        "title_text": (asset.data or {}).get("title_text"),
+    }
+
+
+@router.get("/projects/{project_id}/metadata")
+async def get_metadata(project_id: str, session: SessionDep):
+    from app.db.models import Asset
+
+    asset = (
+        await session.execute(
+            select(Asset).where(
+                Asset.project_id == project_id,
+                Asset.kind == "metadata",
+                Asset.is_selected.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if asset is None:
+        return None
+    data = asset.data or {}
+    return {
+        "title": data.get("title"),
+        "description": data.get("description"),
+        "hashtags": data.get("hashtags"),
+        "fb_caption": data.get("fb_caption"),
+    }
+
+
 @router.post("/projects/{project_id}/render", status_code=202)
 async def request_render(
     project_id: str, body: RenderRequest, session: SessionDep
