@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { fetchJobs } from "./lib/jobs";
+import ScriptPanel from "./ScriptPanel";
 import {
   batchLabel,
   fetchIdeas,
@@ -150,6 +151,14 @@ export default function ProjectDetail({
           )}
         </section>
       ))}
+
+      {project.data && (
+        <ScriptPanel
+          projectId={projectId}
+          selectedIdeaId={project.data.selected_idea_id}
+          activeScriptId={project.data.active_script_id}
+        />
+      )}
     </>
   );
 }

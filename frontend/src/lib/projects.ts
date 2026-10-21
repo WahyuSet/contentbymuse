@@ -26,6 +26,7 @@ export interface Project {
   target_min_s: number;
   target_max_s: number;
   selected_idea_id: string | null;
+  active_script_id: string | null;
   idea_batches: number;
   idea_count: number;
   created_at: string;
