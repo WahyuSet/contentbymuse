@@ -34,6 +34,7 @@ function SceneRow({
   onMove,
   showVoice,
   voiceBusy,
+  imageBusy,
 }: {
   scene: Scene;
   editable: boolean;
@@ -42,6 +43,7 @@ function SceneRow({
   onMove: (scene: Scene, direction: -1 | 1) => void;
   showVoice: boolean;
   voiceBusy: boolean;
+  imageBusy: boolean;
 }) {
   const queryClient = useQueryClient();
   const [voiceover, setVoiceover] = useState(scene.voiceover);
@@ -207,12 +209,12 @@ function SceneRow({
             </>
           ) : (
             <p className="panel-note">
-              {voiceBusy ? "Gambar sedang dibuat…" : "Gambar belum dibuat."}
+              {imageBusy ? "Gambar sedang dibuat…" : "Gambar belum dibuat."}
             </p>
           )}
           <button
             type="button"
-            disabled={voiceBusy || regenImage.isPending}
+            disabled={imageBusy || regenImage.isPending}
             onClick={() => regenImage.mutate()}
           >
             Buat ulang gambar
@@ -247,16 +249,19 @@ export default function ScriptPanel({
     refetchInterval: 1000,
   });
   const jobs = useQuery({ queryKey: ["jobs"], queryFn: fetchJobs, refetchInterval: 1000 });
-  const busySceneIds = new Set(
-    (jobs.data ?? [])
-      .filter(
-        (job) =>
-          (job.type === "voice" || job.type === "align" || job.type === "image") &&
-          (job.status === "queued" || job.status === "processing") &&
-          job.scene_id,
-      )
-      .map((job) => job.scene_id as string),
-  );
+  const busyByType = (types: string[]) =>
+    new Set(
+      (jobs.data ?? [])
+        .filter(
+          (job) =>
+            types.includes(job.type) &&
+            (job.status === "queued" || job.status === "processing") &&
+            job.scene_id,
+        )
+        .map((job) => job.scene_id as string),
+    );
+  const busyVoiceSceneIds = busyByType(["voice", "align"]);
+  const busyImageSceneIds = busyByType(["image"]);
   const chainActive = jobs.data?.some(
     (job) =>
       job.project_id === projectId &&
@@ -392,7 +397,8 @@ export default function ScriptPanel({
                 isLast={index === data.scenes.length - 1}
                 onMove={move}
                 showVoice={data.id === activeScriptId}
-                voiceBusy={busySceneIds.has(scene.id)}
+                voiceBusy={busyVoiceSceneIds.has(scene.id)}
+                imageBusy={busyImageSceneIds.has(scene.id)}
               />
             ))}
           </div>

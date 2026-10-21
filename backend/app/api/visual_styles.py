@@ -64,14 +64,18 @@ async def patch_visual_style(
     if style is None:
         raise NotFoundError("Gaya visual tidak ditemukan.")
     data = body.model_dump(exclude_unset=True)
+    changed = False
     for field in ("name", "style_text", "negative_text", "mascot_anchor"):
         if field in data and data[field] is not None:
             setattr(style, field, data[field])
+            changed = True
     if "image_params" in data and data["image_params"] is not None:
         merged = dict(style.image_params or {})
         merged.update(data["image_params"])
         style.image_params = merged
-    style.version += 1
+        changed = True
+    if changed:
+        style.version += 1
     await session.commit()
     await session.refresh(style)
     return VisualStyleOut.model_validate(style)

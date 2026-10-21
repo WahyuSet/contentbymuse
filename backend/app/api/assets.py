@@ -89,6 +89,12 @@ async def regenerate_voice(scene_id: str, session: SessionDep):
         raise AppError(
             409, "ScriptNotActive", "Suara hanya dibuat ulang untuk script aktif."
         )
+    if script.status != "approved":
+        raise AppError(
+            409,
+            "ScriptNotApproved",
+            "Suara hanya dibuat ulang untuk script yang sudah disetujui.",
+        )
     active = (
         await session.execute(
             select(GenerationJob).where(
@@ -127,6 +133,12 @@ async def regenerate_image(scene_id: str, session: SessionDep):
     if script is None or project is None or project.active_script_id != script.id:
         raise AppError(
             409, "ScriptNotActive", "Gambar hanya dibuat ulang untuk script aktif."
+        )
+    if script.status != "approved":
+        raise AppError(
+            409,
+            "ScriptNotApproved",
+            "Gambar hanya dibuat ulang untuk script yang sudah disetujui.",
         )
     active = (
         await session.execute(

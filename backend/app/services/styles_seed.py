@@ -22,12 +22,17 @@ _NEGATIVE_TEXT = (
 
 async def seed_visual_styles(session: AsyncSession) -> None:
     """Gaya visual bawaan (Spec §2.1). Idempoten berdasarkan nama."""
-    existing = (
+    named = (
         await session.execute(
             select(VisualStyle).where(VisualStyle.name == DEFAULT_STYLE_NAME)
         )
     ).scalar_one_or_none()
-    if existing is None:
+    has_default = (
+        await session.execute(
+            select(VisualStyle.id).where(VisualStyle.is_default.is_(True))
+        )
+    ).first() is not None
+    if named is None:
         session.add(
             VisualStyle(
                 name=DEFAULT_STYLE_NAME,
@@ -36,9 +41,11 @@ async def seed_visual_styles(session: AsyncSession) -> None:
                 negative_text=_NEGATIVE_TEXT,
                 mascot_anchor=_MASCOT_ANCHOR,
                 image_params={"size": "1024x1792"},
-                is_default=True,
+                is_default=not has_default,
             )
         )
+    elif not has_default:
+        named.is_default = True
     await session.flush()
 
 

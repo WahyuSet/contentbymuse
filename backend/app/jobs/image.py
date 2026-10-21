@@ -124,6 +124,10 @@ async def run_image(job, factory: async_sessionmaker) -> dict:
         project = await session.get(Project, script.project_id) if script else None
         if script is None or project is None or project.active_script_id != script.id:
             raise ScriptInputError("Gambar hanya dibuat untuk scene script aktif.")
+        if script.status != "approved":
+            raise ScriptInputError(
+                "Gambar hanya dibuat untuk script yang sudah disetujui."
+            )
         style = await expected_style(session, project)
         if style is None:
             raise NoImageProviderError("Project belum punya gaya visual.")
@@ -137,9 +141,6 @@ async def run_image(job, factory: async_sessionmaker) -> dict:
         reference_asset = None
         if style.reference_asset_id:
             reference_asset = await session.get(Asset, style.reference_asset_id)
-        reference_bytes: bytes | None = None
-        if reference_asset is not None:
-            reference_bytes = (await storage.local_path(reference_asset.storage_key)).read_bytes()
 
         generated = None  # (provider, adapter, input_hash, normalized, original)
         last_error: ProviderError | None = None
@@ -164,6 +165,17 @@ async def run_image(job, factory: async_sessionmaker) -> dict:
                     await session.commit()
                     return {"asset_id": image.id, "cached": True}
             try:
+                reference_bytes: bytes | None = None
+                if use_reference:
+                    try:
+                        reference_bytes = (
+                            await storage.local_path(reference_asset.storage_key)
+                        ).read_bytes()
+                    except (OSError, ValueError) as exc:
+                        raise ServerError(
+                            "File gambar referensi gaya tidak bisa dibaca.",
+                            detail=str(exc),
+                        ) from exc
                 result = await adapter.generate_image(
                     ImageRequest(
                         prompt=prompt,

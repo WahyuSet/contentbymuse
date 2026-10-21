@@ -80,9 +80,19 @@ class MuseCliImage:
                 )
             try:
                 payload = json.loads(out.decode("utf-8", errors="replace"))
-                media_path = payload["media_paths"][0]
-                data = Path(media_path).read_bytes()
-                with Image.open(Path(media_path)) as image:
+                if payload.get("ok") is False:
+                    raise _fail(
+                        "CLI media-generation melaporkan kegagalan.",
+                        detail=str(payload.get("error") or payload)[:500],
+                    )
+                media_path = Path(payload["media_paths"][0]).resolve()
+                if not media_path.is_relative_to(out_dir.resolve()):
+                    raise _fail(
+                        "Path hasil CLI berada di luar direktori keluaran.",
+                        detail=str(media_path),
+                    )
+                data = media_path.read_bytes()
+                with Image.open(media_path) as image:
                     width, height = image.size
                     mime = Image.MIME.get(image.format, "image/jpeg")
             except Exception as exc:

@@ -153,6 +153,10 @@ async def run_voice(job, factory: async_sessionmaker) -> dict:
         project = await session.get(Project, script.project_id) if script else None
         if script is None or project is None or project.active_script_id != script.id:
             raise ScriptInputError("Suara hanya dibuat untuk scene script aktif.")
+        if script.status != "approved":
+            raise ScriptInputError(
+                "Suara hanya dibuat untuk script yang sudah disetujui."
+            )
         scenes = await load_scenes(session, script.id)
         candidates = await voice_candidates(session, project)
         if not candidates:

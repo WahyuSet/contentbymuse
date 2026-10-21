@@ -23,10 +23,10 @@ def upgrade() -> None:
         sa.Column("negative_text", sa.Text(), nullable=False, server_default=""),
         sa.Column("mascot_anchor", sa.Text(), nullable=False, server_default=""),
         sa.Column("reference_asset_id", sa.String(26)),
-        sa.Column("image_params", sa.JSON(), nullable=False, server_default="{}"),
+        sa.Column("image_params", sa.JSON(), server_default="{}"),
         sa.Column("is_default", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True)),
+        sa.Column("updated_at", sa.DateTime(timezone=True)),
     )
     op.add_column("project", sa.Column("image_provider_id", sa.String(26)))
     op.add_column("project", sa.Column("visual_style_id", sa.String(26)))
