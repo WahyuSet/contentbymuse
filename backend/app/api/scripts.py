@@ -378,3 +378,214 @@ async def get_pipeline(project_id: str, session: SessionDep):
         )
 
     return PipelineOut(project_id=project_id, stages=[script_stage, validation_stage])
+
+
+BEATS = {"hook", "setup", "main", "payoff", "cta", "loop"}
+VISUAL_TYPES = {"character", "object", "process", "environment", "diagram", "closeup"}
+TRANSITIONS = {"cut", "crossfade", "punch_in"}
+
+
+class ScenePatch(BaseModel):
+    voiceover: str | None = None
+    subtitle_override: str | None = None
+    visual_prompt: str | None = None
+    include_mascot: bool | None = None
+    visual_type: str | None = None
+    transition: str | None = None
+    beat: str | None = None
+    emphasis_words: list[str] | None = None
+
+
+class SceneCreate(BaseModel):
+    voiceover: str
+    visual_prompt: str
+    beat: str = "main"
+    subtitle_override: str | None = None
+    include_mascot: bool = True
+    visual_type: str = "character"
+    transition: str = "cut"
+    emphasis_words: list[str] = []
+    after_position: int | None = None
+
+
+class ReorderIn(BaseModel):
+    scene_ids: list[str]
+
+
+class ScenePatchOut(BaseModel):
+    scene: SceneOut
+    checks: list[CheckIssueOut]
+
+
+def _validate_scene_enums(data: dict) -> None:
+    checks = (
+        ("beat", BEATS, "Beat tidak dikenal."),
+        ("visual_type", VISUAL_TYPES, "Jenis visual tidak dikenal."),
+        ("transition", TRANSITIONS, "Transisi tidak dikenal."),
+    )
+    for field, allowed, message in checks:
+        if field in data and data[field] is not None and data[field] not in allowed:
+            raise AppError(422, "InvalidScene", f"{message} (field {field})")
+
+
+async def _editable_guard(session: AsyncSession, script: Script) -> Project:
+    project = await session.get(Project, script.project_id)
+    if project is None or project.active_script_id != script.id:
+        raise AppError(
+            409, "ScriptNotActive", "Hanya versi script aktif yang bisa diedit."
+        )
+    busy = (
+        await session.execute(
+            select(GenerationJob).where(
+                GenerationJob.project_id == script.project_id,
+                GenerationJob.type.in_(CHAIN_JOB_TYPES),
+                GenerationJob.status.in_(("queued", "processing")),
+            )
+        )
+    ).scalars().first()
+    if busy is not None:
+        raise AppError(
+            409, "ScriptBusy", "Tunggu job script selesai dulu sebelum mengedit."
+        )
+    return project
+
+
+async def _renumber(session: AsyncSession, scenes: list) -> None:
+    # Dua tahap agar constraint unik (script_id, position) tidak tabrakan di tengah flush.
+    for scene in scenes:
+        scene.position = -scene.position
+    await session.flush()
+    for index, scene in enumerate(scenes, start=1):
+        scene.position = index
+    await session.flush()
+
+
+async def _recount(session: AsyncSession, script: Script, scenes: list) -> None:
+    from app.domain.script_rules import estimate_scene_s
+    from app.jobs.script_chain import WPS_DEFAULT
+
+    total = 0.0
+    for scene in scenes:
+        scene.est_duration_s = estimate_scene_s(scene.voiceover, WPS_DEFAULT)
+        total += scene.est_duration_s
+    script.estimated_duration_s = total
+    if scenes:
+        script.hook = scenes[0].voiceover
+    await session.flush()
+
+
+def _checks_out(issues) -> list[CheckIssueOut]:
+    return [
+        CheckIssueOut(
+            code=issue.code,
+            severity=issue.severity,
+            scene_position=issue.scene_position,
+            message=issue.message,
+        )
+        for issue in issues
+    ]
+
+
+@router.patch("/scenes/{scene_id}", response_model=ScenePatchOut)
+async def patch_scene(scene_id: str, body: ScenePatch, session: SessionDep):
+    from app.db.models import Scene
+
+    scene = await session.get(Scene, scene_id)
+    if scene is None:
+        raise NotFoundError("Scene tidak ditemukan.")
+    script = await _load_script(session, scene.script_id)
+    project = await _editable_guard(session, script)
+    data = body.model_dump(exclude_unset=True)
+    _validate_scene_enums(data)
+    for field, value in data.items():
+        setattr(scene, field, value)
+    scene.revision += 1
+    if script.status in ("validated", "approved"):
+        script.edited_after_validation = True
+    scenes = await load_scenes(session, script.id)
+    await _recount(session, script, scenes)
+    await session.commit()
+    await session.refresh(scene)
+    issues = await checks_for(session, project, script)
+    return ScenePatchOut(scene=SceneOut.model_validate(scene), checks=_checks_out(issues))
+
+
+@router.post("/scripts/{script_id}/scenes", status_code=201, response_model=SceneOut)
+async def create_scene(script_id: str, body: SceneCreate, session: SessionDep):
+    from app.db.models import Scene
+    from app.domain.script_rules import estimate_scene_s
+    from app.jobs.script_chain import WPS_DEFAULT
+
+    script = await _load_script(session, script_id)
+    await _editable_guard(session, script)
+    _validate_scene_enums(body.model_dump())
+    scenes = await load_scenes(session, script.id)
+    insert_at = (
+        body.after_position if body.after_position is not None else len(scenes)
+    )
+    insert_at = max(0, min(insert_at, len(scenes)))
+    scene = Scene(
+        script_id=script.id,
+        position=len(scenes) + 1000,
+        beat=body.beat,
+        voiceover=body.voiceover,
+        subtitle_override=body.subtitle_override,
+        visual_prompt=body.visual_prompt,
+        include_mascot=body.include_mascot,
+        visual_type=body.visual_type,
+        transition=body.transition,
+        emphasis_words=body.emphasis_words,
+        est_duration_s=estimate_scene_s(body.voiceover, WPS_DEFAULT),
+    )
+    session.add(scene)
+    await session.flush()
+    ordered = scenes[:insert_at] + [scene] + scenes[insert_at:]
+    await _renumber(session, ordered)
+    if script.status in ("validated", "approved"):
+        script.edited_after_validation = True
+    await _recount(session, script, ordered)
+    await session.commit()
+    await session.refresh(scene)
+    return SceneOut.model_validate(scene)
+
+
+@router.delete("/scenes/{scene_id}")
+async def delete_scene(scene_id: str, session: SessionDep):
+    from app.db.models import Scene
+
+    scene = await session.get(Scene, scene_id)
+    if scene is None:
+        raise NotFoundError("Scene tidak ditemukan.")
+    script = await _load_script(session, scene.script_id)
+    await _editable_guard(session, script)
+    await session.delete(scene)
+    await session.flush()
+    scenes = await load_scenes(session, script.id)
+    await _renumber(session, scenes)
+    if script.status in ("validated", "approved"):
+        script.edited_after_validation = True
+    await _recount(session, script, scenes)
+    await session.commit()
+    return {"deleted": scene_id}
+
+
+@router.post("/scripts/{script_id}/scenes/reorder", response_model=ScriptDetailOut)
+async def reorder_scenes(script_id: str, body: ReorderIn, session: SessionDep):
+    script = await _load_script(session, script_id)
+    await _editable_guard(session, script)
+    scenes = await load_scenes(session, script.id)
+    by_id = {scene.id: scene for scene in scenes}
+    if len(body.scene_ids) != len(scenes) or set(body.scene_ids) != set(by_id):
+        raise AppError(
+            422,
+            "InvalidSceneOrder",
+            "Urutan harus memuat tepat semua scene milik script ini.",
+        )
+    ordered = [by_id[scene_id] for scene_id in body.scene_ids]
+    await _renumber(session, ordered)
+    if script.status in ("validated", "approved"):
+        script.edited_after_validation = True
+    await _recount(session, script, ordered)
+    await session.commit()
+    await session.refresh(script)
+    return await script_detail(session, script)
