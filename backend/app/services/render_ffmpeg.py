@@ -45,7 +45,10 @@ def build_ffmpeg_command(
     """
     args: list[str] = ["ffmpeg", "-y"]
     for scene in plan.scenes:
-        args += ["-loop", "1", "-t", f"{scene.duration_s:.3f}", "-i", scene.image_path]
+        # Satu frame gambar saja: zoompan mengembangnya menjadi durasi scene.
+        # Memakai -loop justru melipatgandakan panjang (zoompan bekerja per
+        # frame masukan).
+        args += ["-i", scene.image_path]
         args += ["-i", scene.audio_path]
 
     filters: list[str] = []

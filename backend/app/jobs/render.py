@@ -1,3 +1,4 @@
+import asyncio
 import shutil
 import tempfile
 from pathlib import Path
@@ -143,12 +144,26 @@ async def run_render_job(
 
     plan = build_render_plan(scenes=scene_inputs, subtitle_style=style)
     workdir = Path(tempfile.mkdtemp(prefix=f"render-{job.id}-"))
+    progress_state = {"fraction": 0.0}
+
+    def _on_progress(fraction: float) -> None:
+        progress_state["fraction"] = max(progress_state["fraction"], fraction)
+
+    async def _flush_progress() -> None:
+        while True:
+            await asyncio.sleep(5)
+            await ctx.progress(
+                int(progress_state["fraction"] * 100), "Merender video…"
+            )
+
+    flush_task = asyncio.create_task(_flush_progress())
     try:
-        result = await run_render(plan, workdir=workdir)
+        result = await run_render(plan, workdir=workdir, progress_cb=_on_progress)
         asset_id = await _save_result(
             factory, storage, project, result, digest, workdir
         )
     finally:
+        flush_task.cancel()
         shutil.rmtree(workdir, ignore_errors=True)
     await ctx.log(
         "info",
