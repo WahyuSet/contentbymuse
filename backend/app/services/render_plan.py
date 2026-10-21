@@ -111,7 +111,10 @@ def build_render_plan(*, scenes: list[SceneInput], subtitle_style: dict) -> Rend
         motion = _pick_motion(scene, previous_motion)
         previous_motion = motion
         transition = scene.transition or "cut"
-        if index == 0 or duration_s < 0.5:
+        previous_duration = (
+            boundaries[index] - boundaries[index - 1] if index > 0 else 0.0
+        )
+        if index == 0 or duration_s < 0.5 or previous_duration < 0.5:
             transition = "cut"
         plan.scenes.append(
             RenderScene(
