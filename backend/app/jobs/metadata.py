@@ -103,7 +103,7 @@ async def run_metadata(job, factory: async_sessionmaker) -> dict:
             storage_key=stored.key,
             mime="application/json",
             size_bytes=stored.size_bytes,
-            data={"render_id": render.id, **payload},
+            data={"render_id": render.id, "script_id": script.id, **payload},
             input_hash=digest,
             job_id=job.id,
         )

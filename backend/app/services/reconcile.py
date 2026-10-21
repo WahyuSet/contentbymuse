@@ -82,11 +82,22 @@ async def _active_job_exists(session, *, scene_id: str, type_: str) -> bool:
     return row is not None
 
 
+# Batas total job extras per render: 1 antrean awal + maks 2 antrean ulang
+# dari reconcile sesudah kegagalan terminal (mis. provider gambar sempat mati).
+# Tanpa batas, reconcile yang terpicu job lain akan mengantre selamanya.
+EXTRAS_MAX_JOBS_PER_RENDER = 3
+
+
 async def _reconcile_extras(session, project) -> None:
     """Setelah render terpilih ada: antrekan thumbnail + metadata untuk render
-    itu (enqueue_once terdedup oleh input render_id)."""
-    from app.db.models import Asset
-    from app.jobs.queue import enqueue_once
+    itu. enqueue_once terdedup oleh input render_id; job yang berakhir gagal
+    terminal diantrekan ulang secara terbatas (lihat konstanta di atas)."""
+    from sqlalchemy import func
+    from sqlalchemy.exc import IntegrityError
+
+    from app.db.models import Asset, GenerationJob
+    from app.jobs import queue
+    from app.jobs.queue import enqueue_once, sha256_of_json
 
     render = (
         await session.execute(
@@ -100,12 +111,36 @@ async def _reconcile_extras(session, project) -> None:
     if render is None:
         return
     for job_type in ("thumbnail", "metadata"):
-        await enqueue_once(
+        job_input = {"render_id": render.id}
+        job, _created = await enqueue_once(
             session,
             type=job_type,
-            input={"render_id": render.id},
+            input=job_input,
             project_id=project.id,
         )
+        if job.status not in ("failed", "cancelled"):
+            continue
+        attempts = (
+            await session.execute(
+                select(func.count(GenerationJob.id)).where(
+                    GenerationJob.type == job_type,
+                    GenerationJob.project_id == project.id,
+                    GenerationJob.input_hash == sha256_of_json(job_input),
+                )
+            )
+        ).scalar_one()
+        if attempts >= EXTRAS_MAX_JOBS_PER_RENDER:
+            continue
+        try:
+            async with session.begin_nested():
+                await queue.enqueue(
+                    session,
+                    type=job_type,
+                    input=job_input,
+                    project_id=project.id,
+                )
+        except IntegrityError:
+            pass  # kembaran aktif dibuat balapan lain pada saat yang sama
     await session.commit()
 
 

@@ -100,7 +100,10 @@ async def run_thumbnail(job, factory: async_sessionmaker) -> dict:
                 )
             )
         ).scalars().first()
-        if existing is not None:
+        # Cache hanya sah bila berkasnya benar-benar masih ada di storage.
+        if existing is not None and (
+            await storage.local_path(existing.storage_key)
+        ).exists():
             if not existing.is_selected:
                 await asset_service.select_asset(session, existing)
                 await session.commit()

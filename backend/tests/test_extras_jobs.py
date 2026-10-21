@@ -137,3 +137,58 @@ def test_draw_title_text_changes_top_region():
     top = result.crop((0, 80, 1080, 700))
     colors = top.getcolors(maxcolors=1_000_000)
     assert len(colors) > 2  # ada teks tergambar di wilayah atas
+
+
+async def test_reconcile_retries_failed_extras_with_cap(factory):
+    import app.jobs.handlers  # noqa: F401
+    from app.db.models import ContentIdea
+    from app.services.reconcile import reconcile
+
+    async with factory() as session:
+        project = (await session.execute(select(Project))).scalar_one()
+        ideas_job = GenerationJob(type="ideas", project_id=project.id,
+                                  input={}, status="completed")
+        session.add(ideas_job)
+        await session.flush()
+        idea = ContentIdea(project_id=project.id, batch=1, position=1,
+                           title="Ide uji yang cukup panjang", angle="a",
+                           hook="h", why_it_works="w", fact_risk="low",
+                           job_id=ideas_job.id)
+        session.add(idea)
+        await session.flush()
+        project.selected_idea_id = idea.id
+        script = (await session.execute(select(Script))).scalar_one()
+        script.idea_id = idea.id
+        await session.commit()
+        pid = project.id
+
+    async def thumb_jobs():
+        async with factory() as session:
+            return [
+                j for j in (await session.execute(
+                    select(GenerationJob).where(GenerationJob.type == "thumbnail")
+                )).scalars()
+                if (j.input or {}).get("render_id")
+            ]
+
+    async def fail_all_thumbs():
+        async with factory() as session:
+            for j in (await session.execute(
+                select(GenerationJob).where(GenerationJob.type == "thumbnail")
+            )).scalars():
+                if (j.input or {}).get("render_id"):
+                    j.status = "failed"
+            await session.commit()
+
+    await reconcile(pid, factory)
+    assert len(await thumb_jobs()) == 1
+    await fail_all_thumbs()
+    await reconcile(pid, factory)
+    jobs = await thumb_jobs()
+    assert len(jobs) == 2 and any(j.status == "queued" for j in jobs)
+    await fail_all_thumbs()
+    await reconcile(pid, factory)
+    assert len(await thumb_jobs()) == 3
+    await fail_all_thumbs()
+    await reconcile(pid, factory)
+    assert len(await thumb_jobs()) == 3  # batas maks tercapai, tidak diantre lagi

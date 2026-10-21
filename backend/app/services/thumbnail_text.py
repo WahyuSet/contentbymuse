@@ -36,6 +36,8 @@ def draw_title_text(image_bytes: bytes, title_text: str) -> bytes:
         if len(lines) <= MAX_LINES:
             break
         size -= 14
+    # Pada ukuran lantai pun teks panjang dipotong, bukan diluberkan ke maskot.
+    lines = lines[:MAX_LINES]
     line_height = int(size * 1.12)
     y = 110
     for line in lines:

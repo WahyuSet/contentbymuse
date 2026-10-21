@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 SFX_DIR = Path(__file__).resolve().parent.parent / "assets" / "sfx"
@@ -46,7 +47,13 @@ def sanitize_sfx_cues(cues, voiceover: str) -> list[dict]:
         gain = cue.get("gain")
         entry: dict = {"sfx": sfx_id, "word": word}
         if gain is not None:
-            entry["gain"] = min(1.0, max(0.05, float(gain)))
+            try:
+                value = float(gain)
+            except (TypeError, ValueError):
+                continue  # gain cacat: cue dibuang (API mengubahnya jadi 422)
+            if not math.isfinite(value):
+                continue
+            entry["gain"] = min(1.0, max(0.05, value))
         cleaned.append(entry)
         if len(cleaned) >= 2:
             break

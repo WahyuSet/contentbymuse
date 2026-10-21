@@ -25,3 +25,15 @@ def test_sanitize_filters_and_clamps():
     cleaned = sfx_catalog.sanitize_sfx_cues(cues, "Indeks anjlok di pasar hari ini")
     assert [c["sfx"] for c in cleaned] == ["boom", "pop"]  # maks 2, urutan terjaga
     assert cleaned[0]["gain"] == 1.0  # gain terikat
+
+
+def test_sanitize_drops_malformed_gain():
+    cues = [
+        {"sfx": "ding", "word": "anjlok", "gain": "keras"},
+        {"sfx": "pop", "word": "anjlok", "gain": {"x": 1}},
+        {"sfx": "boom", "word": "anjlok", "gain": float("nan")},
+        {"sfx": "cash", "word": "anjlok", "gain": 0.4},
+    ]
+    cleaned = sfx_catalog.sanitize_sfx_cues(cues, "Harga anjlok hari ini")
+    assert [c["sfx"] for c in cleaned] == ["cash"]
+    assert cleaned[0]["gain"] == 0.4

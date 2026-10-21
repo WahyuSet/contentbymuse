@@ -521,7 +521,8 @@ async def patch_scene(scene_id: str, body: ScenePatch, session: SessionDep):
     project = await _editable_guard(session, script)
     data = body.model_dump(exclude_unset=True)
     _validate_scene_enums(data)
-    _validate_sfx_cues(data, scene.voiceover)
+    # Cue divalidasi terhadap narasi SESUDAH patch bila voiceover ikut berubah.
+    _validate_sfx_cues(data, data.get("voiceover", scene.voiceover))
     for field, value in data.items():
         setattr(scene, field, value)
     scene.revision += 1
@@ -543,8 +544,9 @@ async def create_scene(script_id: str, body: SceneCreate, session: SessionDep):
 
     script = await _load_script(session, script_id)
     project = await _editable_guard(session, script)
-    _validate_scene_enums(body.model_dump())
-    _validate_sfx_cues(body.model_dump(), body.voiceover)
+    data = body.model_dump()
+    _validate_scene_enums(data)
+    _validate_sfx_cues(data, body.voiceover)
     scenes = await load_scenes(session, script.id)
     insert_at = (
         body.after_position if body.after_position is not None else len(scenes)
@@ -561,7 +563,7 @@ async def create_scene(script_id: str, body: SceneCreate, session: SessionDep):
         visual_type=body.visual_type,
         transition=body.transition,
         emphasis_words=body.emphasis_words,
-        sfx_cues=body.sfx_cues,
+        sfx_cues=data.get("sfx_cues") or [],
         est_duration_s=estimate_scene_s(body.voiceover, WPS_DEFAULT),
     )
     session.add(scene)
