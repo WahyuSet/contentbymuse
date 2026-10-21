@@ -52,6 +52,7 @@ async def reconcile(project_id: str | None, factory: async_sessionmaker | None =
                     await finalize_best(session, project)
                     await session.commit()
             await _reconcile_voice_production(session, project)
+            await _reconcile_image_production(session, project)
             return
         _job, created = await enqueue_once(
             session,
@@ -182,5 +183,71 @@ async def _reconcile_voice_production(session, project) -> None:
                 changed = True
             except IntegrityError:
                 pass
+    if changed:
+        await session.commit()
+
+
+async def _reconcile_image_production(session, project) -> None:
+    """Produksi gambar pasca-Gerbang B (Spec §4.12): script aktif approved
+    mengantrekan job image per scene yang gambar terpilihnya belum cocok
+    dengan digest salah satu kandidat gambar."""
+    from sqlalchemy.exc import IntegrityError
+
+    from app.db.models import Asset as AssetModel
+    from app.db.models import Script as ScriptModel
+    from app.jobs import queue
+    from app.jobs.image import image_candidates, image_digest_set
+    from app.jobs.script_chain import load_scenes
+    from app.providers.router import ProviderRouter
+    from app.services import assets as asset_service
+    from app.services.styles_seed import expected_style
+
+    if project.active_script_id is None:
+        return
+    script = await session.get(ScriptModel, project.active_script_id)
+    if script is None or script.status != "approved":
+        return
+    style = await expected_style(session, project)
+    if style is None:
+        return
+    expected_provider = await ProviderRouter(session).expected_image(project)
+    if expected_provider is None:
+        return
+    candidates = await image_candidates(session, project)
+    if not candidates:
+        return
+    reference_asset = None
+    if style.reference_asset_id:
+        reference_asset = await session.get(AssetModel, style.reference_asset_id)
+    max_attempts = (
+        1 if expected_provider.quirks.get("retry_safe") is False else 3
+    )
+    scenes = await load_scenes(session, script.id)
+    changed = False
+    for scene in scenes:
+        digests = await image_digest_set(
+            session, project, style, scene, candidates, reference_asset
+        )
+        image = await asset_service.selected_asset(
+            session, project_id=project.id, scene_id=scene.id, kind="image"
+        )
+        if image is not None and image.input_hash in digests:
+            continue
+        if await _active_job_exists(session, scene_id=scene.id, type_="image"):
+            continue
+        try:
+            async with session.begin_nested():
+                await queue.enqueue(
+                    session,
+                    type="image",
+                    input={"scene_id": scene.id},
+                    project_id=project.id,
+                    scene_id=scene.id,
+                    resource_key=f"image:{expected_provider.id}",
+                    max_attempts=max_attempts,
+                )
+            changed = True
+        except IntegrityError:
+            pass
     if changed:
         await session.commit()

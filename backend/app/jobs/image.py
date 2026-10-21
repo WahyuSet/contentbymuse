@@ -46,6 +46,32 @@ async def image_candidates(session, project) -> list[tuple]:
     return ordered
 
 
+async def image_digest_set(session, project, style, scene, candidates, reference_asset) -> set[str]:
+    """Digest keadaan sekarang untuk semua kandidat — dipakai reconcile agar
+    scene yang gambarnya dibuat kandidat fallback pun dianggap selesai
+    (pelajaran review Fase 4)."""
+    prompt = await compose_image_prompt(session, style, scene)
+    params = dict(style.image_params or {})
+    digests = set()
+    for provider, adapter in candidates:
+        use_reference = (
+            adapter.caps.supports_reference_image
+            and scene.include_mascot
+            and reference_asset is not None
+        )
+        digests.add(
+            asset_service.image_input_hash(
+                prompt=prompt,
+                negative_text=style.negative_text or None,
+                provider=provider.id,
+                model=provider.default_model,
+                params=params,
+                reference_hash=reference_asset.input_hash if use_reference else None,
+            )
+        )
+    return digests
+
+
 async def _cached_image(session, project_id: str, input_hash: str) -> Asset | None:
     return (
         await session.execute(
