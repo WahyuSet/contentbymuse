@@ -27,6 +27,8 @@ class AssetOut(BaseModel):
     mime: str
     size_bytes: int
     duration_s: float | None
+    width: int | None = None
+    height: int | None = None
     data: dict | None
     input_hash: str
     provider_id: str | None
