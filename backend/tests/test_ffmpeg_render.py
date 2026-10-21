@@ -80,3 +80,32 @@ def _probe_stream(path) -> str:
         text=True,
         check=True,
     ).stdout
+
+
+async def test_run_render_mixed_chain_fade_after_cut(tmp_path):
+    """Regresi: crossfade SETELAH batas cut pernah gagal total karena basis
+    waktu keluaran concat (1/1000000) berbeda dari segmen zoompan, dan xfade
+    menolak kedua masukan yang basis waktunya tidak sama."""
+    scenes = []
+    transitions = ["cut", "cut", "crossfade", "cut"]
+    for pos in range(1, 5):
+        image, audio = _make_assets(tmp_path, pos)
+        scenes.append(
+            SceneInput(
+                id=f"s{pos}", position=pos, image_path=str(image),
+                audio_path=str(audio), trim=None, clip_duration_s=3.0,
+                voiceover=f"Kata pembuka scene nomor {pos} ini",
+                visual_type="character", transition=transitions[pos - 1],
+                subtitle_override=None, emphasis_words=[],
+                words=[
+                    WordTiming(word=w, start=i * 0.4, end=i * 0.4 + 0.35)
+                    for i, w in enumerate(
+                        f"Kata pembuka scene nomor {pos} ini".split()
+                    )
+                ],
+            )
+        )
+    plan = build_render_plan(scenes=scenes, subtitle_style=STYLE)
+    result = await run_render(plan, workdir=tmp_path / "work")
+    duration = await probe_duration_s(result.video_path)
+    assert abs(duration - plan.total_duration_s) < 0.6

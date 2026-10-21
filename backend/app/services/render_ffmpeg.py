@@ -65,7 +65,8 @@ def build_ffmpeg_command(
             pad += f",tpad=stop_mode=clone:stop_duration={HALF_FADE_S:.4f}"
         filters.append(
             f"[{img_index}:v]scale=2160:3840:force_original_aspect_ratio=increase,"
-            f"crop=2160:3840,{_zoompan(scene)}{pad},format=yuv420p,setsar=1[v{i}]"
+            f"crop=2160:3840,{_zoompan(scene)}{pad},format=yuv420p,setsar=1,"
+            f"settb=AVTB[v{i}]"
         )
         aud_index = i * 2 + 1
         start, end = scene.audio_trim
@@ -87,7 +88,11 @@ def build_ffmpeg_command(
                 f"offset={offset:.4f}[{out_label}]"
             )
         else:
-            filters.append(f"{current}[v{i}]concat=n=2:v=1:a=0[{out_label}]")
+            # settb menyamakan basis waktu keluaran concat (1/1000000) dengan
+            # segmen zoompan (AVTB), syarat xfade pada batas berikutnya.
+            filters.append(
+                f"{current}[v{i}]concat=n=2:v=1:a=0,settb=AVTB[{out_label}]"
+            )
         current = f"[{out_label}]"
         current_label = out_label
     if len(plan.scenes) == 1:
