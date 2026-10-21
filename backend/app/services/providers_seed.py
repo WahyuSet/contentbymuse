@@ -76,4 +76,28 @@ async def seed_providers(session: AsyncSession, settings: Settings) -> None:
                 priority=20,
             )
         )
+    if await _find(session, "Gambar Fake (dry-run)") is None:
+        session.add(
+            Provider(
+                name="Gambar Fake (dry-run)",
+                capability="image",
+                adapter="fake",
+                enabled=True,
+                priority=100,
+            )
+        )
+    if (
+        shutil.which("media-generation")
+        and await _find(session, "Gambar Muse (CLI)") is None
+    ):
+        session.add(
+            Provider(
+                name="Gambar Muse (CLI)",
+                capability="image",
+                adapter="muse_cli",
+                quirks={"timeout_s": 600},
+                enabled=True,
+                priority=20,
+            )
+        )
     await session.flush()

@@ -213,6 +213,8 @@ class Project(Base):
     voice_provider_id: Mapped[str | None] = mapped_column(String(26))
     voice_id: Mapped[str | None] = mapped_column(String(128))
     voice_settings: Mapped[dict] = mapped_column(JSON, default=dict)
+    image_provider_id: Mapped[str | None] = mapped_column(String(26))
+    visual_style_id: Mapped[str | None] = mapped_column(String(26))
     settings: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -354,6 +356,26 @@ class VoiceCalibration(Base):
     voice_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     words_per_second: Mapped[float] = mapped_column(default=0.0)
     samples: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class VisualStyle(Base):
+    __tablename__ = "visual_style"
+
+    id: Mapped[str] = mapped_column(String(26), primary_key=True, default=new_ulid)
+    name: Mapped[str] = mapped_column(String(120))
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    style_text: Mapped[str] = mapped_column(Text, default="")
+    negative_text: Mapped[str] = mapped_column(Text, default="")
+    mascot_anchor: Mapped[str] = mapped_column(Text, default="")
+    reference_asset_id: Mapped[str | None] = mapped_column(String(26))
+    image_params: Mapped[dict] = mapped_column(JSON, default=dict)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )

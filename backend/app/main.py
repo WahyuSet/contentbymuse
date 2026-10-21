@@ -15,6 +15,7 @@ from app.config import get_settings
 from app.db.session import create_engine, session_factory
 from app.services.prompts import sync_prompts
 from app.services.providers_seed import seed_providers
+from app.services.styles_seed import seed_visual_styles
 
 
 @asynccontextmanager
