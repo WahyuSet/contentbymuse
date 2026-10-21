@@ -55,6 +55,7 @@ async def reconcile(project_id: str | None, factory: async_sessionmaker | None =
             await _reconcile_image_production(session, project)
             await _reconcile_render(session, project)
             await _reconcile_extras(session, project)
+            await _reconcile_publish(session, project)
             return
         _job, created = await enqueue_once(
             session,
@@ -141,6 +142,100 @@ async def _reconcile_extras(session, project) -> None:
                 )
         except IntegrityError:
             pass  # kembaran aktif dibuat balapan lain pada saat yang sama
+    await session.commit()
+
+
+PUBLISH_MAX_JOBS_PER_RECORD = 3
+
+
+async def _reconcile_publish(session, project) -> None:
+    """Full-auto publish (keputusan pemilik): begitu render + thumbnail +
+    metadata terpilih lengkap DAN metadata cocok dengan render & script
+    aktif, buat rekor publish per platform dan antrekan job penyiapan paket.
+    Job penyiapan yang gagal terminal diantre ulang terbatas, seperti extras."""
+    from sqlalchemy import func
+    from sqlalchemy.exc import IntegrityError
+
+    from app.db.models import Asset, GenerationJob, PublishRecord
+    from app.jobs import queue
+    from app.jobs.publish import PLATFORMS
+    from app.jobs.queue import enqueue_once, sha256_of_json
+
+    async def _selected(kind: str):
+        return (
+            await session.execute(
+                select(Asset).where(
+                    Asset.project_id == project.id,
+                    Asset.kind == kind,
+                    Asset.is_selected.is_(True),
+                )
+            )
+        ).scalar_one_or_none()
+
+    render = await _selected("render")
+    thumbnail = await _selected("thumbnail")
+    metadata = await _selected("metadata")
+    if render is None or thumbnail is None or metadata is None:
+        return
+    mdata = metadata.data or {}
+    if mdata.get("render_id") != render.id:
+        return
+    if mdata.get("script_id") != project.active_script_id:
+        return
+
+    records: list[PublishRecord] = []
+    for platform in PLATFORMS:
+        record = (
+            await session.execute(
+                select(PublishRecord).where(
+                    PublishRecord.project_id == project.id,
+                    PublishRecord.render_id == render.id,
+                    PublishRecord.platform == platform,
+                )
+            )
+        ).scalar_one_or_none()
+        if record is None:
+            try:
+                async with session.begin_nested():
+                    record = PublishRecord(
+                        project_id=project.id,
+                        render_id=render.id,
+                        platform=platform,
+                    )
+                    session.add(record)
+                    await session.flush()
+            except IntegrityError:
+                continue  # dibuat balapan lain; diambil pada reconcile berikut
+        records.append(record)
+    await session.commit()
+
+    for record in records:
+        if record.status != "queued":
+            continue
+        job_input = {"publish_id": record.id}
+        job, _created = await enqueue_once(
+            session, type="publish", input=job_input, project_id=project.id
+        )
+        if job.status not in ("failed", "cancelled"):
+            continue
+        attempts = (
+            await session.execute(
+                select(func.count(GenerationJob.id)).where(
+                    GenerationJob.type == "publish",
+                    GenerationJob.project_id == project.id,
+                    GenerationJob.input_hash == sha256_of_json(job_input),
+                )
+            )
+        ).scalar_one()
+        if attempts >= PUBLISH_MAX_JOBS_PER_RECORD:
+            continue
+        try:
+            async with session.begin_nested():
+                await queue.enqueue(
+                    session, type="publish", input=job_input, project_id=project.id
+                )
+        except IntegrityError:
+            pass  # kembaran aktif dari balapan lain
     await session.commit()
 
 

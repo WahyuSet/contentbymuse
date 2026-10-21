@@ -49,6 +49,7 @@ from app.jobs.checks_fix import run_checks_fix
 from app.jobs.ideas import run_ideas
 from app.jobs.image import run_image
 from app.jobs.metadata import run_metadata
+from app.jobs.publish import run_publish
 from app.jobs.render import run_render_job
 from app.jobs.revise import run_revise
 from app.jobs.script import run_script
@@ -69,4 +70,5 @@ HANDLERS = {
     "render": run_render_job,
     "thumbnail": run_thumbnail,
     "metadata": run_metadata,
+    "publish": run_publish,
 }

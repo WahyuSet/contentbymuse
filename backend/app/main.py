@@ -73,6 +73,9 @@ def create_app(session_factory: async_sessionmaker | None = None) -> FastAPI:
     app.include_router(catalog_router)
     app.include_router(scripts_router)
     app.include_router(visual_styles_router)
+    from app.api.publish import router as publish_router
+
+    app.include_router(publish_router)
     return app
 
 

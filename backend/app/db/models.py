@@ -380,3 +380,26 @@ class VisualStyle(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
+
+
+class PublishRecord(Base):
+    __tablename__ = "publish_record"
+    __table_args__ = (
+        UniqueConstraint("project_id", "render_id", "platform"),
+    )
+
+    id: Mapped[str] = mapped_column(String(26), primary_key=True, default=new_ulid)
+    project_id: Mapped[str] = mapped_column(String(26), index=True)
+    render_id: Mapped[str] = mapped_column(String(26))
+    platform: Mapped[str] = mapped_column(String(16))  # youtube | facebook
+    status: Mapped[str] = mapped_column(String(16), default="queued")
+    external_id: Mapped[str | None] = mapped_column(String(128))
+    url: Mapped[str | None] = mapped_column(String(512))
+    error: Mapped[str | None] = mapped_column(Text)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
