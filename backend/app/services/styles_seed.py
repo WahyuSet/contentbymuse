@@ -6,9 +6,10 @@ from app.db.models import VisualStyle
 DEFAULT_STYLE_NAME = "Tikus Klasik"
 
 _STYLE_TEXT = (
-    "flat 2D hand-drawn doodle illustration, thin black ink outlines, "
-    "muted colors on warm off-white paper texture, simple shapes, "
-    "lots of empty space, wry Indonesian political-satire cartoon mood"
+    "Flat 2D hand-drawn doodle illustration with a simple drawn background "
+    "that shows where the scene takes place, such as a room, kitchen, street, "
+    "or outdoors, with a few contextual props, calm muted colors, on warm "
+    "off-white paper texture"
 )
 _MASCOT_ANCHOR = (
     "Tikus Berdasi, a cartoon grey rat with a long pointed snout, big round "
