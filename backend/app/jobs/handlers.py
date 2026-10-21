@@ -44,11 +44,13 @@ async def run_provider_test(job, factory: async_sessionmaker) -> dict:
     return {"llm": parsed, "label": label}
 
 
+from app.jobs.align import run_align
 from app.jobs.checks_fix import run_checks_fix
 from app.jobs.ideas import run_ideas
 from app.jobs.revise import run_revise
 from app.jobs.script import run_script
 from app.jobs.validate import run_validate
+from app.jobs.voice import run_voice
 
 HANDLERS = {
     "provider_test": run_provider_test,
@@ -57,4 +59,6 @@ HANDLERS = {
     "checks_fix": run_checks_fix,
     "validate": run_validate,
     "revise": run_revise,
+    "voice": run_voice,
+    "align": run_align,
 }
