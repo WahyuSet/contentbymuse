@@ -62,7 +62,10 @@ def create_app(session_factory: async_sessionmaker | None = None) -> FastAPI:
     async def health():
         return {"status": "ok"}
 
+    from app.api.assets import router as assets_router
+
     app.include_router(jobs_router)
+    app.include_router(assets_router)
     app.include_router(projects_router)
     app.include_router(catalog_router)
     app.include_router(scripts_router)

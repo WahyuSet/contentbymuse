@@ -29,6 +29,9 @@ class ProjectOut(BaseModel):
     target_max_s: int
     selected_idea_id: str | None
     active_script_id: str | None = None
+    voice_provider_id: str | None = None
+    voice_id: str | None = None
+    voice_settings: dict[str, Any] = {}
     settings: dict[str, Any]
     created_at: datetime
     updated_at: datetime
@@ -75,6 +78,9 @@ class ProjectPatch(BaseModel):
     target_min_s: int | None = None
     target_max_s: int | None = None
     settings: dict[str, Any] | None = None
+    voice_provider_id: str | None = None
+    voice_id: str | None = None
+    voice_settings: dict[str, Any] | None = None
 
 
 async def project_out(session: AsyncSession, project: Project) -> ProjectOut:
@@ -115,6 +121,16 @@ async def _check_format(session: AsyncSession, format_id: str | None) -> Format 
     if fmt is None:
         raise AppError(422, "InvalidFormat", "Format tidak ditemukan.")
     return fmt
+
+
+async def _check_voice_provider(session: AsyncSession, provider_id: str | None) -> None:
+    if provider_id is None:
+        return
+    from app.db.models import Provider
+
+    provider = await session.get(Provider, provider_id)
+    if provider is None or provider.capability != "voice":
+        raise AppError(422, "InvalidProvider", "Provider suara tidak ditemukan.")
 
 
 @router.post("/projects", status_code=201, response_model=ProjectOut)
@@ -183,15 +199,22 @@ async def patch_project(project_id: str, body: ProjectPatch, session: SessionDep
             "Durasi target minimum harus lebih kecil dari maksimum.",
         )
     for field in ("title", "topic", "category_id", "format_id", "language",
-                  "target_min_s", "target_max_s"):
+                  "target_min_s", "target_max_s", "voice_id"):
         if field in data:
             setattr(project, field, data[field])
     if "category_id" in data and data["category_id"] is None:
         project.category_source = None
+    if "voice_provider_id" in data:
+        await _check_voice_provider(session, data["voice_provider_id"])
+        project.voice_provider_id = data["voice_provider_id"]
     if "settings" in data and data["settings"] is not None:
         merged = dict(project.settings or {})
         merged.update(data["settings"])
         project.settings = merged
+    if "voice_settings" in data and data["voice_settings"] is not None:
+        merged_voice = dict(project.voice_settings or {})
+        merged_voice.update(data["voice_settings"])
+        project.voice_settings = merged_voice
     await session.commit()
     await session.refresh(project)
     return await project_out(session, project)
