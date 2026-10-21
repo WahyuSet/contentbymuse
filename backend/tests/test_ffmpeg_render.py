@@ -65,14 +65,18 @@ async def test_run_render_produces_mp4(tmp_path):
     duration = await probe_duration_s(result.video_path)
     assert abs(duration - plan.total_duration_s) < 0.6
     assert progress and progress[-1] > 0
-    info = subprocess.run(
+    info = _probe_stream(result.video_path)
+    assert "1080" in info and "1920" in info and "h264" in info
+
+
+def _probe_stream(path) -> str:
+    return subprocess.run(
         [
             "ffprobe", "-v", "error", "-select_streams", "v:0",
             "-show_entries", "stream=width,height,codec_name",
-            "-of", "csv=p=0", str(result.video_path),
+            "-of", "csv=p=0", str(path),
         ],
         capture_output=True,
         text=True,
         check=True,
     ).stdout
-    assert "1080" in info and "1920" in info and "h264" in info

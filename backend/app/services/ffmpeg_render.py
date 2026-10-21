@@ -36,6 +36,7 @@ def detect_encoder(ffmpeg: str = "ffmpeg") -> tuple[str, list[str]]:
         ],
         capture_output=True,
         timeout=60,
+        check=False,
     )
     if result.returncode == 0:
         detected = ("h264_nvenc", list(NVENC_ARGS))
@@ -120,15 +121,13 @@ async def run_render(
             f"dari rencana {plan.total_duration_s:.2f} detik."
         )
     thumb_path = workdir / "thumbnail.jpg"
-    thumb = subprocess.run(
-        [
-            ffmpeg, "-y", "-ss", "0.5", "-i", str(video_path),
-            "-frames:v", "1", "-q:v", "2", str(thumb_path),
-        ],
-        capture_output=True,
-        timeout=60,
+    thumb_proc = await asyncio.create_subprocess_exec(
+        ffmpeg, "-y", "-ss", "0.5", "-i", str(video_path),
+        "-frames:v", "1", "-q:v", "2", str(thumb_path),
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
     )
-    if thumb.returncode != 0 or not thumb_path.exists():
+    if await thumb_proc.wait() != 0 or not thumb_path.exists():
         raise RenderError("Gagal mengambil bingkai thumbnail dari video.")
     warnings: list[str] = []
     if duration < 30 or duration > 40:

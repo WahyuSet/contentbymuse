@@ -48,6 +48,7 @@ from app.jobs.align import run_align
 from app.jobs.checks_fix import run_checks_fix
 from app.jobs.ideas import run_ideas
 from app.jobs.image import run_image
+from app.jobs.render import run_render_job
 from app.jobs.revise import run_revise
 from app.jobs.script import run_script
 from app.jobs.validate import run_validate
@@ -63,4 +64,5 @@ HANDLERS = {
     "voice": run_voice,
     "align": run_align,
     "image": run_image,
+    "render": run_render_job,
 }

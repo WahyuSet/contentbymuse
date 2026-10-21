@@ -53,6 +53,7 @@ async def reconcile(project_id: str | None, factory: async_sessionmaker | None =
                     await session.commit()
             await _reconcile_voice_production(session, project)
             await _reconcile_image_production(session, project)
+            await _reconcile_render(session, project)
             return
         _job, created = await enqueue_once(
             session,
@@ -78,6 +79,54 @@ async def _active_job_exists(session, *, scene_id: str, type_: str) -> bool:
         )
     ).first()
     return row is not None
+
+
+async def _reconcile_render(session, project) -> None:
+    """Antrekan render bila script approved, semua scene punya suara + gambar
+    terpilih, belum ada job render aktif, dan render terpilih tak lagi cocok
+    dengan hash masukan terkini. Enqueue biasa (bukan once) supaya hash yang
+    kembali ke nilai lama tetap mendapat job yang menjawab dari cache."""
+    from app.db.models import Asset, GenerationJob, Script
+    from app.jobs import queue
+    from app.jobs.render import render_hash_parts
+    from app.services import assets as asset_service
+    from app.services.render_settings import get_subtitle_style
+
+    script = (
+        await session.get(Script, project.active_script_id)
+        if project.active_script_id
+        else None
+    )
+    if script is None or script.status != "approved":
+        return
+    style = await get_subtitle_style(session)
+    parts, per_scene = await render_hash_parts(session, project, script, style)
+    if any(voice is None or image is None for _s, voice, image, _t in per_scene):
+        return
+    digest = asset_service.render_input_hash(parts)
+    current = (
+        await session.execute(
+            select(Asset).where(
+                Asset.project_id == project.id,
+                Asset.kind == "render",
+                Asset.is_selected.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if current is not None and current.input_hash == digest:
+        return
+    active = (
+        await session.execute(
+            select(GenerationJob.id).where(
+                GenerationJob.project_id == project.id,
+                GenerationJob.type == "render",
+                GenerationJob.status.in_(("queued", "processing")),
+            )
+        )
+    ).first()
+    if active is not None:
+        return
+    await queue.enqueue(session, type="render", input={}, project_id=project.id)
 
 
 async def _reconcile_voice_production(session, project) -> None:

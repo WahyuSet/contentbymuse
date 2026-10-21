@@ -157,3 +157,12 @@ async def update_calibration(
             row.words_per_second = row.words_per_second + (wps - row.words_per_second) / 20
         row.samples += 1
     await session.flush()
+
+
+def render_input_hash(parts: dict) -> str:
+    import hashlib
+    import json
+
+    return hashlib.sha256(
+        json.dumps(parts, sort_keys=True, default=str).encode("utf-8")
+    ).hexdigest()
