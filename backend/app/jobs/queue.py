@@ -3,6 +3,7 @@ import json
 from typing import Any
 
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import GenerationJob, utcnow
@@ -116,3 +117,48 @@ async def requeue_after_failure(
     job.heartbeat_at = None
     job.finished_at = None
     await session.commit()
+
+
+async def enqueue_once(
+    session: AsyncSession,
+    *,
+    type: str,
+    input: dict,
+    project_id: str | None = None,
+    scene_id: str | None = None,
+) -> tuple[GenerationJob, bool]:
+    """Enqueue yang menolak duplikat persis, termasuk job yang sudah selesai (Spec §4.4).
+
+    Dipakai rantai linear agar langkah yang sama tidak pernah dibuat dua kali
+    untuk input yang sama, walau pemanggilnya berjalan ulang sesudah worker mati.
+    """
+    digest = sha256_of_json(input)
+    stmt = (
+        select(GenerationJob)
+        .where(
+            GenerationJob.type == type,
+            GenerationJob.project_id.is_(project_id)
+            if project_id is None
+            else GenerationJob.project_id == project_id,
+            GenerationJob.scene_id.is_(scene_id)
+            if scene_id is None
+            else GenerationJob.scene_id == scene_id,
+            GenerationJob.input_hash == digest,
+        )
+        .order_by(GenerationJob.created_at.desc())
+    )
+    existing = (await session.execute(stmt)).scalars().first()
+    if existing is not None:
+        return existing, False
+    try:
+        job = await enqueue(
+            session, type=type, input=input, project_id=project_id, scene_id=scene_id
+        )
+    except IntegrityError:
+        # Kalah balapan dengan enqueue aktif yang sama; pakai job pemenangnya.
+        await session.rollback()
+        winner = (await session.execute(stmt)).scalars().first()
+        if winner is None:
+            raise
+        return winner, False
+    return job, True
