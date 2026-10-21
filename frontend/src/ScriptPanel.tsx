@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { regenerateImage as regenerateImageRequest } from "./lib/images";
 import { fetchJobs } from "./lib/jobs";
 import {
   fetchSceneAssets,
@@ -83,8 +84,16 @@ function SceneRow({
   const timings = assets.data?.find(
     (a) => a.kind === "word_timings" && a.is_selected,
   );
+  const image = assets.data?.find((a) => a.kind === "image" && a.is_selected);
   const regen = useMutation({
     mutationFn: () => regenerateVoice(scene.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["scene-assets", scene.id] });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    },
+  });
+  const regenImage = useMutation({
+    mutationFn: () => regenerateImageRequest(scene.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["scene-assets", scene.id] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
@@ -189,6 +198,30 @@ function SceneRow({
           )}
         </div>
       )}
+      {showVoice && (
+        <div className="scene-image">
+          {image ? (
+            <>
+              <img src={image.url} alt={`Gambar scene ${scene.position}`} />
+              <p className="panel-note">Gambar versi {image.version}</p>
+            </>
+          ) : (
+            <p className="panel-note">
+              {voiceBusy ? "Gambar sedang dibuat…" : "Gambar belum dibuat."}
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={voiceBusy || regenImage.isPending}
+            onClick={() => regenImage.mutate()}
+          >
+            Buat ulang gambar
+          </button>
+          {regenImage.isError && (
+            <p className="error-text">{(regenImage.error as Error).message}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -218,7 +251,7 @@ export default function ScriptPanel({
     (jobs.data ?? [])
       .filter(
         (job) =>
-          (job.type === "voice" || job.type === "align") &&
+          (job.type === "voice" || job.type === "align" || job.type === "image") &&
           (job.status === "queued" || job.status === "processing") &&
           job.scene_id,
       )

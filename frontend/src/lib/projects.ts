@@ -30,6 +30,8 @@ export interface Project {
   voice_provider_id: string | null;
   voice_id: string | null;
   voice_settings: Record<string, unknown>;
+  image_provider_id: string | null;
+  visual_style_id: string | null;
   idea_batches: number;
   idea_count: number;
   created_at: string;

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { fetchJobs } from "./lib/jobs";
 import ScriptPanel from "./ScriptPanel";
+import VisualStylePanel from "./VisualStylePanel";
 import VoiceSettings from "./VoiceSettings";
 import {
   batchLabel,
@@ -154,6 +155,8 @@ export default function ProjectDetail({
       ))}
 
       {project.data && <VoiceSettings project={project.data} />}
+
+      {project.data && <VisualStylePanel project={project.data} />}
 
       {project.data && (
         <ScriptPanel
