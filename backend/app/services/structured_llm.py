@@ -165,7 +165,7 @@ class StructuredLLM:
                         validated = validate(data)
                         if validated is not None:
                             data = validated
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 — parse/validasi apa pun gagal = malformed (§5.2)
                     if not feedback_used:
                         feedback_used = True
                         messages = messages + [

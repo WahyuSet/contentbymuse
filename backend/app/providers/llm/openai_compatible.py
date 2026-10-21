@@ -2,7 +2,7 @@ import time
 
 import httpx
 
-from app.providers.base import LLMCaps, Message, TextRequest, TextResult, Usage
+from app.providers.base import LLMCaps, TextRequest, TextResult, Usage
 from app.providers.errors import (
     AuthError,
     BadRequestError,

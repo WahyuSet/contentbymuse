@@ -1,6 +1,7 @@
 export interface Job {
   id: string;
   type: string;
+  project_id: string | null;
   status: string;
   progress: number;
   progress_message: string;

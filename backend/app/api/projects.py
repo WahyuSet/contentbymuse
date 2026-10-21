@@ -1,13 +1,13 @@
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import AppError, NotFoundError
-from app.api.jobs import JobOut, SessionDep, get_factory
+from app.api.jobs import FactoryDep, JobOut, SessionDep
 from app.db.models import Category, ContentIdea, Format, GenerationJob, Project
 from app.jobs import queue
 from app.services.reconcile import reconcile
@@ -227,7 +227,7 @@ async def list_ideas(project_id: str, session: SessionDep):
 async def select_idea(
     idea_id: str,
     session: SessionDep,
-    factory=Depends(get_factory),
+    factory: FactoryDep,
 ):
     idea = await session.get(ContentIdea, idea_id)
     if idea is None:

@@ -72,6 +72,7 @@ async def get_session(factory: Annotated[async_sessionmaker, Depends(get_factory
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+FactoryDep = Annotated[async_sessionmaker, Depends(get_factory)]
 
 
 @router.post("/jobs", status_code=202, response_model=JobOut)

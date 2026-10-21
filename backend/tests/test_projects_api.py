@@ -103,7 +103,7 @@ def test_select_idea_sets_project(tmp_path):
             await session.commit()
             return factory, project.id, idea.id
 
-    factory, project_id, idea_id = asyncio.run(_setup())
+    factory, _project_id, idea_id = asyncio.run(_setup())
     client = TestClient(create_app(session_factory=factory))
     response = client.post(f"/api/ideas/{idea_id}/select")
     assert response.status_code == 200
