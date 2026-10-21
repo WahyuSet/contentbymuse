@@ -1,0 +1,1 @@
+Hook rules: the hook is a question, a surprising fact, or a small mystery that makes the viewer stay. It must be answerable by the video itself and must not promise something the content never delivers. Never open with greetings, channel introductions, or "di video kali ini". One hook idea per line, no clickbait that contradicts the facts.

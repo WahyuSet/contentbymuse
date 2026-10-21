@@ -4,7 +4,7 @@ import typing
 
 from pydantic import BaseModel
 
-from app.providers.base import LLMCaps, TextRequest, TextResult, Usage
+from app.providers.base import LLMCaps, Message, TextRequest, TextResult, Usage
 
 _QUESTION_LEAD = re.compile(
     r"^(kenapa|mengapa|apa|bagaimana|kenalkah|tahukah kamu)\s+", flags=re.IGNORECASE
@@ -81,12 +81,79 @@ def _ideas_fixture(messages) -> dict:
     return {"suggested_category": "animals", "ideas": ideas}
 
 
+_SCRIPT_VOICEOVERS = [
+    ("hook", "Rahasia besar di balik {c3}", "character", True),
+    ("setup", "Banyak orang melihatnya tetapi jarang ada yang memperhatikan", "closeup", True),
+    ("main", "Padahal ada penjelasan sederhana di balik kejadian ini", "character", True),
+    ("main", "Penjelasan itu berkaitan dengan kebiasaan dan lingkungan sekitarnya", "environment", False),
+    ("main", "Saat kondisi berubah tubuh langsung menyesuaikan diri perlahan", "process", True),
+    ("main", "Penyesuaian ini membantu bertahan dari gangguan di sekitarnya", "diagram", True),
+    ("main", "Tidak semua kejadian menunjukkan proses yang sama persis", "character", False),
+    ("main", "Ada kalanya prosesnya gagal dan hasilnya berbeda jauh", "closeup", True),
+    ("payoff", "Jadi kejadian tadi bukan kebetulan tanpa sebab apa pun", "character", True),
+    ("cta", "Pernah mengalami hal serupa di rumah atau sekitarmu", "environment", True),
+]
+
+
+def _script_fixture(messages: list[Message]) -> dict:
+    title = "Topik tanpa judul"
+    for message in messages:
+        for line in message.content.splitlines():
+            if line.startswith("Idea title:"):
+                title = line.removeprefix("Idea title:").strip() or title
+    core = " ".join(_QUESTION_LEAD.sub("", title).rstrip(".").split()[:6]) or "topik ini"
+    c3 = " ".join(core.split()[:3]) or "hal ini"
+    scenes = []
+    for i, (beat, template, visual_type, mascot) in enumerate(_SCRIPT_VOICEOVERS, start=1):
+        voiceover = template.format(c3=c3)
+        scenes.append(
+            {
+                "beat": beat,
+                "voiceover": voiceover,
+                "subtitle": None,
+                "visual_prompt": (
+                    f"A simple scene about {core}, moment {i}"
+                    if mascot
+                    else f"[NO_MASCOT] A simple scene about {core}, moment {i}"
+                ),
+                "include_mascot": mascot,
+                "visual_type": visual_type,
+                "transition": "cut",
+                "emphasis_words": [],
+            }
+        )
+    return {
+        "schema_version": "script.v1",
+        "title": title,
+        "hook": scenes[0]["voiceover"],
+        "scenes": scenes,
+        "claims_to_verify": [
+            f"Klaim utama tentang {core}",
+            "Angka atau fakta pendukung yang disebut di dalam narasi",
+        ],
+    }
+
+
+def _validation_fixture() -> dict:
+    return {
+        "status": "PASS",
+        "score": 85,
+        "summary": "Script rapi, hook jujur, dan alur mudah diikuti (mode kering).",
+        "issues": [],
+        "claims_to_verify": [],
+    }
+
+
 class FakeLLM:
     caps = LLMCaps(structured="json_object")
 
     async def generate_text(self, req: TextRequest, ctx=None) -> TextResult:
         joined = "\n".join(m.content for m in req.messages)
-        if "suggested_category" in joined:
+        if '"score"' in joined and '"summary"' in joined and "schema_version" not in joined:
+            payload = _validation_fixture()
+        elif "schema_version" in joined:
+            payload = _script_fixture(req.messages)
+        elif "suggested_category" in joined:
             # Mode json_object tidak mengirim schema; kontrak di prompt adalah penandanya.
             payload = _ideas_fixture(req.messages)
         elif req.response_schema is not None:

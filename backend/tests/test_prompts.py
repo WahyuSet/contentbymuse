@@ -1,4 +1,4 @@
-from app.domain.llm_outputs import IdeasOutput
+from app.domain.llm_outputs import IdeasOutput, ScriptDraft
 from app.services.prompts import PromptService, output_contract, parse_frontmatter, sync_prompts
 
 
@@ -54,3 +54,25 @@ async def test_render_ideas_prompt(session):
     joined = "\n".join(m.content for m in rendered.messages)
     assert "cicak" in joined and "Topik:" in joined
     assert rendered.messages[0].role == "system"
+
+
+async def test_render_script_generate_includes_blocks_and_contract(session):
+    await sync_prompts(session)
+    await session.commit()
+    rendered = await PromptService(session).render(
+        "script.generate",
+        {
+            "idea": {"title": "Cicak memutus ekor", "angle": "a", "hook": "h"},
+            "category": None,
+            "format": None,
+            "language": "id-ID",
+            "target_min_s": 30,
+            "target_max_s": 40,
+        },
+    )
+    assert rendered.output_model is ScriptDraft
+    assert rendered.temperature == 0.8
+    joined = "\n".join(m.content for m in rendered.messages)
+    assert "kata per detik" in joined
+    assert "schema_version" in joined
+    assert "Cicak memutus ekor" in joined
