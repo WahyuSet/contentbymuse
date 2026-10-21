@@ -516,3 +516,23 @@ code {
   font: inherit;
   margin-top: 4px;
 }
+
+.render-player {
+  width: 270px;
+  aspect-ratio: 9 / 16;
+  background: #1c1a16;
+  border: 1px solid #d8d2c4;
+  border-radius: 8px;
+}
+
+.render-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.render-downloads a {
+  color: #146c33;
+  font-weight: 600;
+}
