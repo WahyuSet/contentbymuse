@@ -44,6 +44,9 @@ async def run_provider_test(job, factory: async_sessionmaker) -> dict:
     return {"llm": parsed, "label": label}
 
 
+from app.jobs.ideas import run_ideas
+
 HANDLERS = {
     "provider_test": run_provider_test,
+    "ideas": run_ideas,
 }

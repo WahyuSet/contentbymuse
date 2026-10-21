@@ -64,8 +64,8 @@ class Worker:
                 await queue.mark_cancelled(session, job)
             except Exception as exc:  # worker tetap hidup apa pun kegagalan handler
                 error = {
-                    "kind": type(exc).__name__,
-                    "message": str(exc),
+                    "kind": getattr(exc, "kind", type(exc).__name__),
+                    "message": getattr(exc, "message_id", None) or str(exc),
                     "retryable": bool(getattr(exc, "retryable", True)),
                 }
                 if error["retryable"] and job.attempts < job.max_attempts:
@@ -84,7 +84,7 @@ class Worker:
                 else:
                     await queue.mark_completed(session, job, result)
             project_id = job.project_id
-        await reconcile(project_id)
+        await reconcile(project_id, self._factory)
 
     async def recover_stale_once(self) -> None:
         cutoff = utcnow() - timedelta(seconds=STALE_AFTER_S)
