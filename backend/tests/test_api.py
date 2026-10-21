@@ -56,6 +56,31 @@ def test_missing_job_is_404_standard_shape(client):
     assert response.json()["error"]["kind"] == "NotFound"
 
 
+def test_unexpected_error_uses_standard_shape(tmp_path):
+    import asyncio
+
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path}/boom.db")
+
+    async def _setup():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    asyncio.run(_setup())
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    app = create_app(session_factory=factory)
+
+    @app.get("/api/boom")
+    async def boom():
+        raise RuntimeError("meledak")
+
+    boom_client = TestClient(app, raise_server_exceptions=False)
+    response = boom_client.get("/api/boom")
+    assert response.status_code == 500
+    body = response.json()
+    assert body["error"]["kind"] == "InternalError"
+    assert "detail" not in body
+
+
 def test_cancel_queued_job(client):
     job = client.post("/api/jobs", json={"type": "provider_test", "input": {}}).json()
     response = client.post(f"/api/jobs/{job['id']}/cancel")

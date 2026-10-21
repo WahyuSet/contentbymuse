@@ -94,3 +94,25 @@ async def mark_failed(session: AsyncSession, job: GenerationJob, error: dict) ->
     job.error = error
     job.finished_at = utcnow()
     await session.commit()
+
+
+async def mark_cancelled(session: AsyncSession, job: GenerationJob) -> None:
+    # Hasil handler dibuang (Spec §7.5): job berakhir cancelled, bukan completed.
+    job.status = "cancelled"
+    job.result = None
+    job.finished_at = utcnow()
+    await session.commit()
+
+
+async def requeue_after_failure(
+    session: AsyncSession, job: GenerationJob, error: dict, delay_s: float
+) -> None:
+    from datetime import timedelta
+
+    job.status = "queued"
+    job.error = error
+    job.run_after = utcnow() + timedelta(seconds=delay_s)
+    job.locked_by = None
+    job.heartbeat_at = None
+    job.finished_at = None
+    await session.commit()

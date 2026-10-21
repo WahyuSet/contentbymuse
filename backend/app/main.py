@@ -22,6 +22,15 @@ def create_app(session_factory: async_sessionmaker | None = None) -> FastAPI:
             content=error_body(exc.kind, exc.message, exc.detail),
         )
 
+    @app.exception_handler(Exception)
+    async def unhandled_error_handler(_request: Request, _exc: Exception):
+        return JSONResponse(
+            status_code=500,
+            content=error_body(
+                "InternalError", "Terjadi kesalahan tak terduga di server.", None
+            ),
+        )
+
     @app.exception_handler(RequestValidationError)
     async def validation_handler(_request: Request, exc: RequestValidationError):
         return JSONResponse(

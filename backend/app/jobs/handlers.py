@@ -4,7 +4,7 @@ import json
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.db.models import UsageRecord
-from app.jobs.context import DbCallContext
+from app.jobs.context import DbCallContext, JobCancelled
 from app.providers.base import Message, TextRequest
 from app.providers.registry import ADAPTERS
 
@@ -21,6 +21,8 @@ async def run_provider_test(job, factory: async_sessionmaker) -> dict:
     sleep_ms = min(int(job.input.get("sleep_ms", 0)), 2000)
     if sleep_ms:
         await asyncio.sleep(sleep_ms / 1000)
+    if await ctx.cancelled():
+        raise JobCancelled()
     async with factory() as session:
         session.add(
             UsageRecord(

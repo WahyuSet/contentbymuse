@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.db.models import GenerationJob, utcnow
 from app.db.session import create_engine, session_factory
 from app.jobs import queue
+from app.jobs.context import JobCancelled
 from app.jobs.handlers import HANDLERS
 from app.services.reconcile import reconcile
 
@@ -57,15 +58,29 @@ class Worker:
                 if handler is None:
                     raise LookupError(f"Tidak ada handler untuk tipe job {job.type}")
                 result = await handler(job, self._factory)
-            except Exception as exc:  # handler gagal → job gagal, worker tetap hidup
-                await queue.mark_failed(
-                    session,
-                    job,
-                    {"kind": type(exc).__name__, "message": str(exc), "retryable": False},
-                )
-                logger.exception("Job %s gagal", job_id)
+            except JobCancelled:
+                await queue.mark_cancelled(session, job)
+            except Exception as exc:  # worker tetap hidup apa pun kegagalan handler
+                error = {
+                    "kind": type(exc).__name__,
+                    "message": str(exc),
+                    "retryable": bool(getattr(exc, "retryable", True)),
+                }
+                if error["retryable"] and job.attempts < job.max_attempts:
+                    # Backoff Spec §7.3: 5 dtk sebelum percobaan ke-2, 20 dtk ke-3.
+                    delay = 5 if job.attempts <= 1 else 20
+                    await queue.requeue_after_failure(session, job, error, delay)
+                    logger.warning("Job %s gagal, diantrekan ulang: %s", job_id, exc)
+                else:
+                    error["retryable"] = False
+                    await queue.mark_failed(session, job, error)
+                    logger.exception("Job %s gagal permanen", job_id)
             else:
-                await queue.mark_completed(session, job, result)
+                await session.refresh(job)
+                if job.cancel_requested:
+                    await queue.mark_cancelled(session, job)
+                else:
+                    await queue.mark_completed(session, job, result)
             project_id = job.project_id
         await reconcile(project_id)
 

@@ -5,6 +5,10 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.db.models import GenerationJob, JobEvent, utcnow
 
 
+class JobCancelled(Exception):
+    """Dinaikkan handler saat permintaan batal terlihat lewat ctx.cancelled()."""
+
+
 class DbCallContext:
     """CallContext yang menulis progres dan log job ke DB (Spec §7.6)."""
 

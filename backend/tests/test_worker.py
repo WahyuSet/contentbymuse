@@ -67,6 +67,55 @@ async def test_recover_stale_requeues_then_fails(session):
     assert refreshed.error["kind"] == "WorkerInterrupted"
 
 
+async def test_cancel_during_processing_discards_result(session):
+    import asyncio
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    job = await enqueue(
+        session, type="provider_test", input={"label": "batal", "sleep_ms": 1500}
+    )
+    await session.commit()
+    factory = async_sessionmaker(session.bind, expire_on_commit=False)
+    worker = Worker(session_factory=factory)
+    task = asyncio.create_task(worker.run_once())
+    for _ in range(50):
+        await asyncio.sleep(0.05)
+        async with factory() as other:
+            current = await other.get(GenerationJob, job.id)
+            if current.status == "processing":
+                current.cancel_requested = True
+                await other.commit()
+                break
+    assert await task is True
+    refreshed = await session.get(GenerationJob, job.id)
+    await session.refresh(refreshed)
+    assert refreshed.status == "cancelled"
+    assert refreshed.result is None
+
+
+async def test_handler_failure_requeues_with_backoff_then_fails(session, monkeypatch):
+    from app.jobs.handlers import HANDLERS
+
+    async def always_fails(job, factory):
+        raise RuntimeError("gangguan sementara")
+
+    monkeypatch.setitem(HANDLERS, "flaky", always_fails)
+    job = await enqueue(session, type="flaky", input={})
+    await session.commit()
+    worker = Worker(session_factory=session_factory_of(session))
+
+    for expected in ("queued", "queued", "failed"):
+        assert await worker.run_once() is True
+        refreshed = await session.get(GenerationJob, job.id)
+        await session.refresh(refreshed)
+        assert refreshed.status == expected
+        if expected == "queued":
+            assert refreshed.error["kind"] == "RuntimeError"
+            refreshed.run_after = utcnow() - timedelta(seconds=1)
+            await session.commit()
+
+
 def session_factory_of(session):
     bind = session.bind
 
