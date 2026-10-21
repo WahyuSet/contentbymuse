@@ -150,7 +150,7 @@ export default function ScriptPanel({
 }) {
   const queryClient = useQueryClient();
   const [viewedId, setViewedId] = useState<string | null>(null);
-  const [checkedClaims, setCheckedClaims] = useState<Set<number>>(new Set());
+  const [checkedClaims, setCheckedClaims] = useState<Set<string>>(new Set());
   const [newVoiceover, setNewVoiceover] = useState("");
   const [newVisual, setNewVisual] = useState("");
 
@@ -178,6 +178,12 @@ export default function ScriptPanel({
   useEffect(() => {
     setCheckedClaims(new Set());
   }, [detailId]);
+
+  // Centang klaim diikat ke bunyi klaimnya, bukan posisi: bila polling membawa
+  // rumusan klaim baru, klaim itu mulai dari keadaan belum tercentang.
+  const claimTexts = detail.data?.claims ?? [];
+  const allClaimsChecked =
+    claimTexts.length > 0 && claimTexts.every((claim) => checkedClaims.has(claim));
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["scripts", projectId] });
@@ -222,8 +228,6 @@ export default function ScriptPanel({
 
   const data = detail.data;
   const editable = Boolean(data && activeScriptId === data.id && !chainActive);
-  const allClaimsChecked =
-    data !== undefined && data.claims.every((_, index) => checkedClaims.has(index));
 
   return (
     <section className="panel">
@@ -374,11 +378,11 @@ export default function ScriptPanel({
                   <label className="checkbox-label">
                     <input
                       type="checkbox"
-                      checked={checkedClaims.has(index)}
+                      checked={checkedClaims.has(claim)}
                       onChange={(e) => {
                         const next = new Set(checkedClaims);
-                        if (e.target.checked) next.add(index);
-                        else next.delete(index);
+                        if (e.target.checked) next.add(claim);
+                        else next.delete(claim);
                         setCheckedClaims(next);
                       }}
                     />

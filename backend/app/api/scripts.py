@@ -242,7 +242,9 @@ async def approve_script(
             "Semua klaim harus dicek dulu sebelum menyetujui.",
         )
     scenes = await load_scenes(session, script.id)
-    if any(not s.voiceover.strip() or not s.visual_prompt.strip() for s in scenes):
+    if not scenes or any(
+        not s.voiceover.strip() or not s.visual_prompt.strip() for s in scenes
+    ):
         raise AppError(
             409, "EmptyScene", "Masih ada scene dengan narasi atau prompt visual kosong."
         )
@@ -469,8 +471,7 @@ async def _recount(session: AsyncSession, script: Script, scenes: list) -> None:
         scene.est_duration_s = estimate_scene_s(scene.voiceover, WPS_DEFAULT)
         total += scene.est_duration_s
     script.estimated_duration_s = total
-    if scenes:
-        script.hook = scenes[0].voiceover
+    script.hook = scenes[0].voiceover if scenes else ""
     await session.flush()
 
 

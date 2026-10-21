@@ -16,6 +16,7 @@ async def reconcile(project_id: str | None, factory: async_sessionmaker | None =
     """
     if project_id is None or factory is None:
         return
+    from app.db.models import GenerationJob
     from app.jobs.handlers import HANDLERS
     from app.jobs.queue import enqueue_once
 
@@ -31,6 +32,25 @@ async def reconcile(project_id: str | None, factory: async_sessionmaker | None =
             )
         ).first()
         if existing is not None:
+            if project.active_script_id is None:
+                # Rantai bisa berhenti tanpa keputusan (job gagal final/dibatalkan):
+                # tetapkan versi terbaik yang ada sebagai aktif (Spec §4.4/§4.12).
+                active_jobs = (
+                    await session.execute(
+                        select(GenerationJob.id).where(
+                            GenerationJob.project_id == project.id,
+                            GenerationJob.type.in_(
+                                ("script", "checks_fix", "validate", "revise")
+                            ),
+                            GenerationJob.status.in_(("queued", "processing")),
+                        )
+                    )
+                ).first()
+                if active_jobs is None:
+                    from app.services.finalize import finalize_best
+
+                    await finalize_best(session, project)
+                    await session.commit()
             return
         _job, created = await enqueue_once(
             session,
