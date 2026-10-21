@@ -29,3 +29,25 @@ def sfx_path(sfx_id: str) -> Path:
 
 def default_gain(sfx_id: str) -> float:
     return float(SFX_CATALOG[sfx_id]["gain"])
+
+
+def sanitize_sfx_cues(cues, voiceover: str) -> list[dict]:
+    """Saring cue dari LLM/pemilik: id sah, kata pemicu benar-benar ada di
+    narasi, gain terikat 0.05-1.0, maksimal 2 cue per scene."""
+    tokens = {t.strip(".,!?;:\"'").lower() for t in voiceover.split()}
+    cleaned: list[dict] = []
+    for cue in cues or []:
+        if not isinstance(cue, dict):
+            continue
+        sfx_id = str(cue.get("sfx", ""))
+        word = str(cue.get("word", "")).strip()
+        if not is_valid_sfx(sfx_id) or word.lower() not in tokens:
+            continue
+        gain = cue.get("gain")
+        entry: dict = {"sfx": sfx_id, "word": word}
+        if gain is not None:
+            entry["gain"] = min(1.0, max(0.05, float(gain)))
+        cleaned.append(entry)
+        if len(cleaned) >= 2:
+            break
+    return cleaned

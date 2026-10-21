@@ -51,6 +51,7 @@ class SceneOut(BaseModel):
     visual_type: str
     transition: str
     emphasis_words: list
+    sfx_cues: list
     est_duration_s: float
     revision: int
 
@@ -396,6 +397,7 @@ class ScenePatch(BaseModel):
     transition: str | None = None
     beat: str | None = None
     emphasis_words: list[str] | None = None
+    sfx_cues: list[dict] | None = None
 
 
 class SceneCreate(BaseModel):
@@ -407,6 +409,7 @@ class SceneCreate(BaseModel):
     visual_type: str = "character"
     transition: str = "cut"
     emphasis_words: list[str] = []
+    sfx_cues: list[dict] = []
     after_position: int | None = None
 
 
@@ -490,6 +493,23 @@ def _checks_out(issues) -> list[CheckIssueOut]:
     ]
 
 
+def _validate_sfx_cues(data: dict, voiceover: str) -> None:
+    from app.services import sfx_catalog
+
+    cues = data.get("sfx_cues")
+    if cues is None:
+        return
+    cleaned = sfx_catalog.sanitize_sfx_cues(cues, voiceover)
+    if len(cleaned) != len(cues):
+        raise AppError(
+            422,
+            "InvalidSfx",
+            "Cue SFX tidak sah: id harus dari katalog dan kata pemicu harus "
+            "ada di narasi (maksimal 2 per scene).",
+        )
+    data["sfx_cues"] = cleaned
+
+
 @router.patch("/scenes/{scene_id}", response_model=ScenePatchOut)
 async def patch_scene(scene_id: str, body: ScenePatch, session: SessionDep):
     from app.db.models import Scene
@@ -501,6 +521,7 @@ async def patch_scene(scene_id: str, body: ScenePatch, session: SessionDep):
     project = await _editable_guard(session, script)
     data = body.model_dump(exclude_unset=True)
     _validate_scene_enums(data)
+    _validate_sfx_cues(data, scene.voiceover)
     for field, value in data.items():
         setattr(scene, field, value)
     scene.revision += 1
@@ -523,6 +544,7 @@ async def create_scene(script_id: str, body: SceneCreate, session: SessionDep):
     script = await _load_script(session, script_id)
     project = await _editable_guard(session, script)
     _validate_scene_enums(body.model_dump())
+    _validate_sfx_cues(body.model_dump(), body.voiceover)
     scenes = await load_scenes(session, script.id)
     insert_at = (
         body.after_position if body.after_position is not None else len(scenes)
@@ -539,6 +561,7 @@ async def create_scene(script_id: str, body: SceneCreate, session: SessionDep):
         visual_type=body.visual_type,
         transition=body.transition,
         emphasis_words=body.emphasis_words,
+        sfx_cues=body.sfx_cues,
         est_duration_s=estimate_scene_s(body.voiceover, WPS_DEFAULT),
     )
     session.add(scene)

@@ -9,6 +9,7 @@ from app.domain.llm_outputs import ScriptDraft
 from app.domain.script_rules import estimate_scene_s, run_checks
 from app.jobs.ideas import NoLlmProviderError, _catalog_input
 from app.providers.router import ProviderRouter
+from app.services import sfx_catalog
 
 WPS_DEFAULT = 2.3
 
@@ -109,6 +110,9 @@ async def save_draft(
                 visual_type=scene.visual_type,
                 transition=scene.transition,
                 emphasis_words=list(scene.emphasis_words),
+                sfx_cues=sfx_catalog.sanitize_sfx_cues(
+                    [cue.model_dump() for cue in scene.sfx_cues], scene.voiceover
+                ),
                 est_duration_s=est,
             )
         )

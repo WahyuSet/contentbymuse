@@ -26,6 +26,14 @@ class IdeasOutput(BaseModel):
     ideas: list[IdeaItem] = Field(description="Tepat 8 ide")
 
 
+class SfxCue(BaseModel):
+    sfx: str = Field(description="Id efek suara dari katalog blok sfx_rules")
+    word: str = Field(description="Kata persis dari voiceover yang memicu efek")
+    gain: float | None = Field(
+        default=None, description="Kekuatan 0.05 sampai 1.0; kosongkan untuk bawaan"
+    )
+
+
 class SceneDraft(BaseModel):
     beat: str = Field(
         pattern="^(hook|setup|main|payoff|cta|loop)$",
@@ -34,7 +42,7 @@ class SceneDraft(BaseModel):
     voiceover: str = Field(description="Narasi lisan Bahasa Indonesia, 3 sampai 16 kata")
     subtitle: str | None = Field(default=None, description="Teks subtitle bila berbeda dari voiceover")
     visual_prompt: str = Field(description="Prompt gambar dalam Bahasa Inggris, satu adegan visual")
-    include_mascot: bool = Field(default=True, description="True bila maskot stickman berkepala hijau tampil")
+    include_mascot: bool = Field(default=True, description="True bila maskot Tikus Berdasi tampil di scene")
     visual_type: str = Field(
         pattern="^(character|object|process|environment|diagram|closeup)$",
         description="Jenis visual utama scene",
@@ -46,6 +54,10 @@ class SceneDraft(BaseModel):
     )
     emphasis_words: list[str] = Field(
         default_factory=list, description="Kata dari voiceover yang disorot di subtitle"
+    )
+    sfx_cues: list[SfxCue] = Field(
+        default_factory=list,
+        description="Cue efek suara menempel pada kata voiceover (maksimal 2)",
     )
 
 
