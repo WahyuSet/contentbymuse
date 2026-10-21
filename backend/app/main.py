@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -8,10 +10,21 @@ from app.api.errors import AppError, error_body
 from app.api.jobs import router as jobs_router
 from app.config import get_settings
 from app.db.session import create_engine, session_factory
+from app.services.prompts import sync_prompts
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    factory = getattr(app.state, "session_factory", None)
+    if factory is not None:
+        async with factory() as session:
+            await sync_prompts(session)
+            await session.commit()
+    yield
 
 
 def create_app(session_factory: async_sessionmaker | None = None) -> FastAPI:
-    app = FastAPI(title="Stickman Content Factory")
+    app = FastAPI(title="Stickman Content Factory", lifespan=_lifespan)
     if session_factory is not None:
         app.state.session_factory = session_factory
 

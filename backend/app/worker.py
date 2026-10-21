@@ -12,6 +12,7 @@ from app.db.session import create_engine, session_factory
 from app.jobs import queue
 from app.jobs.context import JobCancelled
 from app.jobs.handlers import HANDLERS
+from app.services.prompts import sync_prompts
 from app.services.reconcile import reconcile
 
 logger = logging.getLogger(__name__)
@@ -163,8 +164,12 @@ async def _main() -> None:
     settings = get_settings()
     logging.basicConfig(level=settings.log_level)
     engine = create_engine(settings)
+    factory = session_factory(engine)
+    async with factory() as session:
+        await sync_prompts(session)
+        await session.commit()
     worker = Worker(
-        session_factory=session_factory(engine),
+        session_factory=factory,
         concurrency=settings.worker_concurrency,
     )
     logger.info("Worker mulai: %s", worker._worker_id)
