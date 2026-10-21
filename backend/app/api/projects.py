@@ -303,3 +303,120 @@ async def select_idea(
     await session.refresh(project)
     await reconcile(project.id, factory)
     return await project_out(session, project)
+
+
+class RenderRequest(BaseModel):
+    force: bool = False
+
+
+class RenderOut(BaseModel):
+    version: int
+    duration_s: float | None
+    encoder: str | None
+    warnings: list[str] = []
+    files: dict[str, str] = {}
+    created_at: datetime
+
+
+@router.get("/projects/{project_id}/render", response_model=RenderOut | None)
+async def get_render(project_id: str, session: SessionDep):
+    from app.db.models import Asset
+
+    await _load_project(session, project_id)
+    asset = (
+        await session.execute(
+            select(Asset).where(
+                Asset.project_id == project_id,
+                Asset.kind == "render",
+                Asset.is_selected.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if asset is None:
+        return None
+    files = {
+        name: f"/api/files/{key}"
+        for name, key in (asset.data or {}).get("files", {}).items()
+    }
+    return RenderOut(
+        version=asset.version,
+        duration_s=asset.duration_s,
+        encoder=(asset.data or {}).get("encoder"),
+        warnings=(asset.data or {}).get("warnings", []),
+        files=files,
+        created_at=asset.created_at,
+    )
+
+
+@router.post("/projects/{project_id}/render", status_code=202)
+async def request_render(
+    project_id: str, body: RenderRequest, session: SessionDep
+):
+    from app.db.models import Asset, Script
+    from app.jobs.render import render_hash_parts
+    from app.services import assets as asset_service
+    from app.services.render_settings import get_subtitle_style
+
+    project = await _load_project(session, project_id)
+    script = (
+        await session.get(Script, project.active_script_id)
+        if project.active_script_id
+        else None
+    )
+    if script is None or script.status != "approved":
+        raise AppError(
+            409,
+            "ScriptNotApproved",
+            "Render hanya dibuat untuk script yang sudah disetujui.",
+        )
+    style = await get_subtitle_style(session)
+    parts, per_scene = await render_hash_parts(session, project, script, style)
+    missing = []
+    for scene, voice, image, _t in per_scene:
+        if voice is None:
+            missing.append(f"scene {scene.position} belum punya suara")
+        if image is None:
+            missing.append(f"scene {scene.position} belum punya gambar")
+    if missing:
+        raise AppError(
+            409,
+            "RenderNotReady",
+            "Render belum siap: " + "; ".join(missing) + ".",
+        )
+    active = (
+        await session.execute(
+            select(GenerationJob).where(
+                GenerationJob.project_id == project.id,
+                GenerationJob.type == "render",
+                GenerationJob.status.in_(("queued", "processing")),
+            )
+        )
+    ).scalars().first()
+    if active is not None:
+        return {"job": JobOut.model_validate(active), "created": False}
+    digest = asset_service.render_input_hash(parts)
+    current = (
+        await session.execute(
+            select(Asset).where(
+                Asset.project_id == project.id,
+                Asset.kind == "render",
+                Asset.is_selected.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if current is not None and current.input_hash == digest and not body.force:
+        raise AppError(
+            409,
+            "RenderUpToDate",
+            "Video sudah sesuai keadaan terbaru; pakai force untuk membuat ulang.",
+        )
+    job = await queue.enqueue(
+        session,
+        type="render",
+        input={"force": body.force},
+        project_id=project.id,
+        resource_key="render",
+    )
+    await session.commit()
+    await session.refresh(job)
+    return {"job": JobOut.model_validate(job), "created": True}
