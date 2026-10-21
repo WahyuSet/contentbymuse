@@ -47,6 +47,25 @@ class ProviderRouter:
             return adapter_cls()
         return adapter_cls(quirks=provider.quirks)
 
+    async def build_image(self, provider: Provider, settings: Settings):
+        adapter_cls = ADAPTERS.get(("image", provider.adapter))
+        if adapter_cls is None:
+            raise LookupError(f"Adapter gambar '{provider.adapter}' tidak dikenal.")
+        if provider.adapter == "fake":
+            return adapter_cls()
+        return adapter_cls(quirks=provider.quirks)
+
+    async def expected_image(self, project) -> Provider | None:
+        """Provider gambar produksi project: pin menang, selain itu kandidat
+        gambar teratas router (pola expected_voice)."""
+        pinned = None
+        if project.image_provider_id:
+            pinned = await self._session.get(Provider, project.image_provider_id)
+        if pinned is not None and pinned.capability == "image" and pinned.enabled:
+            return pinned
+        candidates = await self.candidates("image")
+        return candidates[0] if candidates else None
+
     async def expected_voice(self, project) -> tuple[Provider, str] | None:
         """Suara produksi project (Spec §4.3): pin project menang; tanpa pin,
         kandidat suara teratas router beserta suara bawaannya."""

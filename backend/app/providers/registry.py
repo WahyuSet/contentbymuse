@@ -1,4 +1,5 @@
 from app.providers.image.fake import FakeImage
+from app.providers.image.muse_cli import MuseCliImage
 from app.providers.llm.fake import FakeLLM
 from app.providers.llm.openai_compatible import OpenAICompatibleLLM
 from app.providers.video.fake import FakeVideo
@@ -12,5 +13,6 @@ ADAPTERS: dict[tuple[str, str], type] = {
     ("voice", "fake"): FakeVoice,
     ("voice", "muse_cli"): MuseCliVoice,
     ("image", "fake"): FakeImage,
+    ("image", "muse_cli"): MuseCliImage,
     ("video", "fake"): FakeVideo,
 }
