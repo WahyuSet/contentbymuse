@@ -27,6 +27,9 @@ export interface Project {
   target_max_s: number;
   selected_idea_id: string | null;
   active_script_id: string | null;
+  voice_provider_id: string | null;
+  voice_id: string | null;
+  voice_settings: Record<string, unknown>;
   idea_batches: number;
   idea_count: number;
   created_at: string;
@@ -93,6 +96,17 @@ export function generateIdeas(
   projectId: string,
 ): Promise<{ job: { id: string; status: string }; created: boolean }> {
   return api(`/api/projects/${projectId}/ideas/generate`, { method: "POST" });
+}
+
+export function patchProject(
+  id: string,
+  body: Record<string, unknown>,
+): Promise<Project> {
+  return api(`/api/projects/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 export function selectIdea(ideaId: string): Promise<Project> {

@@ -79,3 +79,17 @@ def test_whisper_low_match_ratio_uses_proportional():
     result = aligner.align(None, "satu dua tiga empat", bounds=(0.0, 4.0))
     assert result.method == "proportional"
     assert result.match_ratio < 0.6
+    assert result.warning is not None
+
+
+def test_aligner_never_calls_ctx_log_synchronously():
+    # Regresi E2E Fase 4: ctx job bersifat async dua argumen; aligner sinkron
+    # tidak boleh memanggilnya — peringatan pulang lewat AlignResult.warning.
+    class ExplodingCtx:
+        def log(self, *args):
+            raise AssertionError("ctx.log tidak boleh dipanggil aligner")
+
+    aligner = WhisperAligner(transcriber=_fake_transcriber(["xyz", "abc"]))
+    result = aligner.align(None, "satu dua tiga empat", ctx=ExplodingCtx(), bounds=(0.0, 4.0))
+    assert result.method == "proportional"
+    assert result.warning is not None

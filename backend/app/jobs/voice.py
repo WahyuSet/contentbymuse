@@ -120,14 +120,22 @@ async def _enqueue_align(session, *, project: Project, scene: Scene, clip: Asset
     ).scalars().first()
     if active is not None:
         return
-    await queue.enqueue(
-        session,
-        type="align",
-        input={"scene_id": scene.id, "clip_asset_id": clip.id},
-        project_id=project.id,
-        scene_id=scene.id,
-        resource_key=f"voice:{provider_id}",
-    )
+    # Cek di atas tidak atomik: indeks dedup aktif adalah penjaga sebenarnya,
+    # jadi tabrakan balapan di sini jinak — job align kembar sudah ada.
+    from sqlalchemy.exc import IntegrityError
+
+    try:
+        async with session.begin_nested():
+            await queue.enqueue(
+                session,
+                type="align",
+                input={"scene_id": scene.id, "clip_asset_id": clip.id},
+                project_id=project.id,
+                scene_id=scene.id,
+                resource_key=f"voice:{provider_id}",
+            )
+    except IntegrityError:
+        pass
 
 
 async def run_voice(job, factory: async_sessionmaker) -> dict:

@@ -83,6 +83,8 @@ async def _reconcile_voice_production(session, project) -> None:
     """Produksi suara pasca-Gerbang B (Spec §4.12): script aktif yang approved
     mengantrekan job voice per scene yang klip terpilihnya belum cocok dengan
     hash keadaan sekarang, dan job align untuk klip tanpa timing."""
+    from sqlalchemy.exc import IntegrityError
+
     from app.db.models import Script
     from app.jobs import queue
     from app.jobs.script_chain import load_scenes
@@ -122,15 +124,20 @@ async def _reconcile_voice_production(session, project) -> None:
         )
         if clip is None or clip.input_hash != digest:
             if not await _active_job_exists(session, scene_id=scene.id, type_="voice"):
-                await queue.enqueue(
-                    session,
-                    type="voice",
-                    input={"scene_id": scene.id},
-                    project_id=project.id,
-                    scene_id=scene.id,
-                    resource_key=f"voice:{provider.id}",
-                )
-                changed = True
+                # Indeks dedup aktif menjaga balapan cek-lalu-sisip; tabrakan jinak.
+                try:
+                    async with session.begin_nested():
+                        await queue.enqueue(
+                            session,
+                            type="voice",
+                            input={"scene_id": scene.id},
+                            project_id=project.id,
+                            scene_id=scene.id,
+                            resource_key=f"voice:{provider.id}",
+                        )
+                    changed = True
+                except IntegrityError:
+                    pass
             continue
         timings = (
             await session.execute(
@@ -147,14 +154,18 @@ async def _reconcile_voice_production(session, project) -> None:
         if missing_timings and not await _active_job_exists(
             session, scene_id=scene.id, type_="align"
         ):
-            await queue.enqueue(
-                session,
-                type="align",
-                input={"scene_id": scene.id, "clip_asset_id": clip.id},
-                project_id=project.id,
-                scene_id=scene.id,
-                resource_key=f"voice:{provider.id}",
-            )
-            changed = True
+            try:
+                async with session.begin_nested():
+                    await queue.enqueue(
+                        session,
+                        type="align",
+                        input={"scene_id": scene.id, "clip_asset_id": clip.id},
+                        project_id=project.id,
+                        scene_id=scene.id,
+                        resource_key=f"voice:{provider.id}",
+                    )
+                changed = True
+            except IntegrityError:
+                pass
     if changed:
         await session.commit()

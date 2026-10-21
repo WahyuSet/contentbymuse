@@ -3,6 +3,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { fetchJobs } from "./lib/jobs";
 import {
+  fetchSceneAssets,
+  regenerateVoice,
+  timingsLabel,
+} from "./lib/voice";
+import {
   addScene,
   approveScript,
   deleteScene,
@@ -26,12 +31,16 @@ function SceneRow({
   isFirst,
   isLast,
   onMove,
+  showVoice,
+  voiceBusy,
 }: {
   scene: Scene;
   editable: boolean;
   isFirst: boolean;
   isLast: boolean;
   onMove: (scene: Scene, direction: -1 | 1) => void;
+  showVoice: boolean;
+  voiceBusy: boolean;
 }) {
   const queryClient = useQueryClient();
   const [voiceover, setVoiceover] = useState(scene.voiceover);
@@ -63,6 +72,23 @@ function SceneRow({
   const remove = useMutation({
     mutationFn: () => deleteScene(scene.id),
     onSuccess: invalidate,
+  });
+  const assets = useQuery({
+    queryKey: ["scene-assets", scene.id],
+    queryFn: () => fetchSceneAssets(scene.id),
+    enabled: showVoice,
+    refetchInterval: 1000,
+  });
+  const clip = assets.data?.find((a) => a.kind === "voice_clip" && a.is_selected);
+  const timings = assets.data?.find(
+    (a) => a.kind === "word_timings" && a.is_selected,
+  );
+  const regen = useMutation({
+    mutationFn: () => regenerateVoice(scene.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["scene-assets", scene.id] });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    },
   });
   const dirty =
     voiceover !== scene.voiceover ||
@@ -135,6 +161,34 @@ function SceneRow({
       )}
       {save.isError && <p className="error-text">{(save.error as Error).message}</p>}
       {remove.isError && <p className="error-text">{(remove.error as Error).message}</p>}
+      {showVoice && (
+        <div className="scene-voice">
+          {clip ? (
+            <>
+              <audio controls src={clip.url} preload="metadata" />
+              <p className="panel-note">
+                Klip suara versi {clip.version}
+                {clip.duration_s ? ` · ${clip.duration_s.toFixed(1)} detik` : ""}
+              </p>
+            </>
+          ) : (
+            <p className="panel-note">
+              {voiceBusy ? "Suara sedang dibuat…" : "Suara belum dibuat."}
+            </p>
+          )}
+          {timings && <p className="panel-note">{timingsLabel(timings)}</p>}
+          <button
+            type="button"
+            disabled={voiceBusy || regen.isPending}
+            onClick={() => regen.mutate()}
+          >
+            Buat ulang suara
+          </button>
+          {regen.isError && (
+            <p className="error-text">{(regen.error as Error).message}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -160,6 +214,16 @@ export default function ScriptPanel({
     refetchInterval: 1000,
   });
   const jobs = useQuery({ queryKey: ["jobs"], queryFn: fetchJobs, refetchInterval: 1000 });
+  const busySceneIds = new Set(
+    (jobs.data ?? [])
+      .filter(
+        (job) =>
+          (job.type === "voice" || job.type === "align") &&
+          (job.status === "queued" || job.status === "processing") &&
+          job.scene_id,
+      )
+      .map((job) => job.scene_id as string),
+  );
   const chainActive = jobs.data?.some(
     (job) =>
       job.project_id === projectId &&
@@ -294,6 +358,8 @@ export default function ScriptPanel({
                 isFirst={index === 0}
                 isLast={index === data.scenes.length - 1}
                 onMove={move}
+                showVoice={data.id === activeScriptId}
+                voiceBusy={busySceneIds.has(scene.id)}
               />
             ))}
           </div>

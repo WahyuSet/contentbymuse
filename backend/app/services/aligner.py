@@ -1,6 +1,7 @@
 import asyncio
 import os
 import string
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
@@ -24,6 +25,7 @@ class AlignResult:
     words: list[AlignWord] = field(default_factory=list)
     method: str = "proportional"
     match_ratio: float = 0.0
+    warning: str | None = None
 
 
 class ProportionalAligner:
@@ -47,14 +49,32 @@ class ProportionalAligner:
         return AlignResult(words=words, method="proportional", match_ratio=0.0)
 
 
+_MODEL_CACHE: dict[str, object] = {}
+_MODEL_LOCK = threading.Lock()
+
+
+def _load_model(model_name: str):
+    # Model dimuat sekali per proses: memuat ulang per job align membuang
+    # waktu dan RAM (satu model small ~0,5 GB) tanpa manfaat. Kunci memastikan
+    # job paralel menunggu muatan yang sama, bukan memuat salinan sendiri.
+    with _MODEL_LOCK:
+        if model_name not in _MODEL_CACHE:
+            from faster_whisper import WhisperModel
+
+            try:
+                _MODEL_CACHE[model_name] = WhisperModel(
+                    model_name, device="cuda", compute_type="int8"
+                )
+            except Exception:  # noqa: BLE001 - CUDA tetap gagal berarti CPU
+                _MODEL_CACHE[model_name] = WhisperModel(
+                    model_name, device="cpu", compute_type="int8"
+                )
+    return _MODEL_CACHE[model_name]
+
+
 def _default_transcriber(model_name: str) -> Callable:
     def _transcribe(audio_path) -> list[AlignWord]:
-        from faster_whisper import WhisperModel
-
-        try:
-            model = WhisperModel(model_name, device="cuda", compute_type="int8")
-        except Exception:  # noqa: BLE001 - CUDA tak tersedia berarti ulang di CPU
-            model = WhisperModel(model_name, device="cpu", compute_type="int8")
+        model = _load_model(model_name)
         segments, _info = model.transcribe(
             str(audio_path), language="id", word_timestamps=True
         )
@@ -107,11 +127,10 @@ class WhisperAligner:
         if ratio < 0.6:
             result = ProportionalAligner().align(audio_path, text, ctx, bounds)
             result.match_ratio = ratio
-            if ctx is not None:
-                ctx.log(
-                    f"Rasio kecocokan Whisper rendah ({ratio:.2f}); "
-                    "memakai alignment proporsional."
-                )
+            result.warning = (
+                f"Rasio kecocokan Whisper rendah ({ratio:.2f}); "
+                "memakai alignment proporsional."
+            )
             return result
 
         # Interpolasi kata yang tidak cocok di antara jangkar terdekat.

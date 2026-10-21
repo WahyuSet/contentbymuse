@@ -46,7 +46,9 @@ async def run_align(job, factory: async_sessionmaker) -> dict:
 
     path = await storage.local_path(storage_key)
     result = await align_words(path, text, bounds=bounds, ctx=ctx)
-    if result.method == "proportional":
+    if result.warning:
+        await ctx.log("warning", result.warning)
+    elif result.method == "proportional":
         await ctx.log(
             "info",
             "Alignment proporsional dipakai (Whisper tidak menghasilkan kecocokan cukup).",
