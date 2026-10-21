@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { fetchJobs } from "./lib/jobs";
+import PublishPanel from "./PublishPanel";
 import RenderPanel from "./RenderPanel";
 import ScriptPanel from "./ScriptPanel";
 import VisualStylePanel from "./VisualStylePanel";
@@ -160,6 +161,7 @@ export default function ProjectDetail({
       {project.data && <VisualStylePanel project={project.data} />}
 
       {project.data && <RenderPanel projectId={projectId} />}
+      {project.data && <PublishPanel projectId={projectId} />}
 
       {project.data && (
         <ScriptPanel
