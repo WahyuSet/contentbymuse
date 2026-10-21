@@ -159,6 +159,14 @@ async def get_project(project_id: str, session: SessionDep):
 async def patch_project(project_id: str, body: ProjectPatch, session: SessionDep):
     project = await _load_project(session, project_id)
     data = body.model_dump(exclude_unset=True)
+    new_topic = data.get("topic", project.topic)
+    new_category_id = data.get("category_id", project.category_id)
+    if not (new_topic and str(new_topic).strip()) and not new_category_id:
+        raise AppError(
+            422,
+            "ProjectNeedsTopicOrCategory",
+            "Project harus punya topik atau kategori.",
+        )
     if "category_id" in data:
         await _check_category(session, data["category_id"])
         if data["category_id"]:
@@ -177,6 +185,8 @@ async def patch_project(project_id: str, body: ProjectPatch, session: SessionDep
                   "target_min_s", "target_max_s"):
         if field in data:
             setattr(project, field, data[field])
+    if "category_id" in data and data["category_id"] is None:
+        project.category_source = None
     if "settings" in data and data["settings"] is not None:
         merged = dict(project.settings or {})
         merged.update(data["settings"])

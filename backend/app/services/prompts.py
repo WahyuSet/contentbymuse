@@ -6,7 +6,7 @@ from pathlib import Path
 import yaml
 from jinja2 import DictLoader, Environment, StrictUndefined, UndefinedError
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Category, Format, PromptTemplate, PromptVersion
@@ -111,6 +111,7 @@ async def sync_prompts(session: AsyncSession, root: Path | None = None) -> dict:
     files = _scan_files(root)
     templates: dict[str, PromptTemplate] = {}
     versions_created = 0
+    version_counters: dict[str, int] = {}
     newest_file: dict[str, tuple[int, str]] = {}
     for key, kind, path, file_version in files:
         text = path.read_text(encoding="utf-8")
@@ -137,7 +138,19 @@ async def sync_prompts(session: AsyncSession, root: Path | None = None) -> dict:
             )
         ).scalar_one_or_none()
         if existing is None:
-            version_no = file_version or int(meta.get("version", 1))
+            # Nomor versi adalah urutan di DB, bukan nomor di file: mengedit file
+            # di tempat (alur §6.2) membuat baris versi baru tanpa tabrakan unik.
+            if template.id not in version_counters:
+                current_max = (
+                    await session.execute(
+                        select(func.max(PromptVersion.version)).where(
+                            PromptVersion.template_id == template.id
+                        )
+                    )
+                ).scalar_one_or_none() or 0
+                version_counters[template.id] = current_max + 1
+            version_no = version_counters[template.id]
+            version_counters[template.id] += 1
             session.add(
                 PromptVersion(
                     template_id=template.id,

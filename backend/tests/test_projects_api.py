@@ -112,6 +112,32 @@ def test_select_idea_sets_project(tmp_path):
     assert body["title"] == "Judul ide terpilih yang panjang"
 
 
+def test_patch_cannot_clear_last_of_topic_and_category(client):
+    project = client.post("/api/projects", json={"topic": "cicak"}).json()
+    response = client.patch(f"/api/projects/{project['id']}", json={"topic": None})
+    assert response.status_code == 422
+    assert response.json()["error"]["kind"] == "ProjectNeedsTopicOrCategory"
+    fetched = client.get(f"/api/projects/{project['id']}").json()
+    assert fetched["topic"] == "cicak"
+
+
+def test_patch_clearing_category_keeps_invariant_and_resets_source(client):
+    categories = client.get("/api/categories").json()
+    animals = next(c for c in categories if c["slug"] == "animals")
+    project = client.post(
+        "/api/projects", json={"topic": "cicak", "category_id": animals["id"]}
+    ).json()
+    assert project["category_source"] == "user"
+    response = client.patch(
+        f"/api/projects/{project['id']}", json={"category_id": None}
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["category_id"] is None
+    assert body["category_source"] is None
+    assert body["topic"] == "cicak"
+
+
 def test_providers_list_hides_key(client):
     providers = client.get("/api/providers").json()
     assert providers

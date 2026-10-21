@@ -20,6 +20,27 @@ async def test_sync_creates_templates_categories_formats(session):
     assert again["versions"] == 0
 
 
+async def test_sync_survives_inplace_file_edit(session, tmp_path):
+    root = tmp_path / "prompts"
+    (root / "categories").mkdir(parents=True)
+    target = root / "categories" / "animals.md"
+    target.write_text(
+        "---\nname: Hewan\ndescription: awal\nfact_check: normal\nversion: 1\n---\nAturan versi satu.",
+        encoding="utf-8",
+    )
+    await sync_prompts(session, root)
+    await session.commit()
+    target.write_text(
+        "---\nname: Hewan\ndescription: berubah\nfact_check: normal\nversion: 1\n---\nAturan versi dua.",
+        encoding="utf-8",
+    )
+    summary = await sync_prompts(session, root)
+    await session.commit()
+    assert summary["versions"] == 1
+    body = await PromptService(session).active_body("category.animals")
+    assert body == "Aturan versi dua."
+
+
 async def test_render_ideas_prompt(session):
     await sync_prompts(session)
     await session.commit()
