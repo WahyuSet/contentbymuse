@@ -43,6 +43,7 @@ class TextResult:
     usage: Usage = field(default_factory=Usage)
     model: str = "fake"
     latency_ms: int = 0
+    finish_reason: str | None = None
 
 
 @dataclass

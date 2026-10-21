@@ -13,6 +13,7 @@ from app.jobs import queue
 from app.jobs.context import JobCancelled
 from app.jobs.handlers import HANDLERS
 from app.services.prompts import sync_prompts
+from app.services.providers_seed import seed_providers
 from app.services.reconcile import reconcile
 
 logger = logging.getLogger(__name__)
@@ -167,6 +168,7 @@ async def _main() -> None:
     factory = session_factory(engine)
     async with factory() as session:
         await sync_prompts(session)
+        await seed_providers(session, settings)
         await session.commit()
     worker = Worker(
         session_factory=factory,

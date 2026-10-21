@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     storage_path: Path = Path("./storage")
     worker_concurrency: int = 6
     log_level: str = "INFO"
+    llm_base_url: str | None = None
+    llm_model: str | None = None
+    llm_api_key: str | None = None
 
 
 @lru_cache

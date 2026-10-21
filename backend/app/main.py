@@ -11,6 +11,7 @@ from app.api.jobs import router as jobs_router
 from app.config import get_settings
 from app.db.session import create_engine, session_factory
 from app.services.prompts import sync_prompts
+from app.services.providers_seed import seed_providers
 
 
 @asynccontextmanager
@@ -19,6 +20,7 @@ async def _lifespan(app: FastAPI):
     if factory is not None:
         async with factory() as session:
             await sync_prompts(session)
+            await seed_providers(session, get_settings())
             await session.commit()
     yield
 
