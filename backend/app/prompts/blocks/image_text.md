@@ -1,0 +1,1 @@
+Text in image: any text, label, or sign that appears must be written in Bahasa Indonesia with correct spelling, exactly as requested. If the scene does not ask for a specific text label, draw no text at all.

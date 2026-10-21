@@ -25,6 +25,7 @@ async def _lifespan(app: FastAPI):
         async with factory() as session:
             await sync_prompts(session)
             await seed_providers(session, get_settings())
+            await seed_visual_styles(session)
             await session.commit()
     yield
 

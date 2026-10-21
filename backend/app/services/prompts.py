@@ -295,3 +295,43 @@ def _split_sections(body: str) -> tuple[str, str]:
             body[user_match.end() :].strip(),
         )
     return "", body.strip()
+
+
+_FLOOR_LINE = (
+    "The character stands on a simple flat ground line near the lower third "
+    "of the frame."
+)
+
+
+async def compose_image_prompt(session, style, scene) -> str:
+    """Prompt gambar final §4.8: render template image.compose (bukan LLM).
+
+    Perapian gaya 6p diterapkan sejak v1 di sini: spasi style_text dirapikan,
+    jangkar maskot diakhiri tepat satu titik, dan kalimat garis lantai hanya
+    untuk visual_type character/environment.
+    """
+    style_text = " ".join((style.style_text or "").split())
+    anchor = ""
+    if scene.include_mascot and style.mascot_anchor:
+        anchor = style.mascot_anchor.strip().rstrip(".").strip() + "."
+    floor_line = (
+        _FLOOR_LINE if scene.visual_type in ("character", "environment") else ""
+    )
+    rendered = await PromptService(session).render(
+        "image.compose",
+        {
+            "style_text": style_text,
+            "mascot_anchor": anchor,
+            "visual_prompt": scene.visual_prompt,
+            "visual_type": scene.visual_type,
+            "floor_line": floor_line,
+        },
+    )
+    text = "\n".join(message.content for message in rendered.messages)
+    lines = [line.strip() for line in text.splitlines()]
+    lines = [
+        line
+        for line in lines
+        if line and line not in ("## [system]", "## [user]")
+    ]
+    return "\n".join(lines)

@@ -1,0 +1,1 @@
+Safe zone: compose for a vertical 9:16 frame with the main subject in the upper-middle area. Keep the bottom quarter of the frame and the right edge free of important details, because subtitles and app buttons cover those areas.
