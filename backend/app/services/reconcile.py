@@ -106,6 +106,7 @@ async def _reconcile_extras(session, project) -> None:
             input={"render_id": render.id},
             project_id=project.id,
         )
+    await session.commit()
 
 
 async def _reconcile_render(session, project) -> None:

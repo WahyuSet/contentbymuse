@@ -90,3 +90,33 @@ async def test_thumbnail_requires_render(factory):
     jobs = await _jobs(factory)
     with pytest.raises(NoRenderError):
         await run_thumbnail(jobs["thumbnail"], factory)
+
+
+async def test_reconcile_enqueues_extras(factory):
+    import app.jobs.handlers  # noqa: F401 — mendaftarkan semua handler
+    from app.db.models import ContentIdea
+    from app.services.reconcile import reconcile
+
+    async with factory() as session:
+        project = (await session.execute(select(Project))).scalar_one()
+        ideas_job = GenerationJob(type="ideas", project_id=project.id,
+                                  input={}, status="completed")
+        session.add(ideas_job)
+        await session.flush()
+        idea = ContentIdea(project_id=project.id, batch=1, position=1,
+                           title="Ide uji yang cukup panjang", angle="a",
+                           hook="h", why_it_works="w", fact_risk="low",
+                           job_id=ideas_job.id)
+        session.add(idea)
+        await session.flush()
+        project.selected_idea_id = idea.id
+        script = (await session.execute(select(Script))).scalar_one()
+        script.idea_id = idea.id
+        await session.commit()
+        pid = project.id
+    await reconcile(pid, factory)
+    async with factory() as session:
+        types = {
+            j.type for j in (await session.execute(select(GenerationJob))).scalars()
+        }
+        assert {"thumbnail", "metadata"} <= types
