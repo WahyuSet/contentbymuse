@@ -151,7 +151,9 @@ async def test_publish_handler_fails_on_script_mismatch(factory):
             select(GenerationJob).where(GenerationJob.type == "publish")
         )).scalars().first()
         await session.commit()
-    with pytest.raises(Exception):
+    from app.jobs.script_chain import ScriptInputError
+
+    with pytest.raises(ScriptInputError):
         await run_publish(job, factory)
     async with factory() as session:
         record = await session.get(PublishRecord, job.input["publish_id"])
