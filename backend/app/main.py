@@ -6,8 +6,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from app.api.catalog import router as catalog_router
 from app.api.errors import AppError, error_body
 from app.api.jobs import router as jobs_router
+from app.api.projects import router as projects_router
 from app.config import get_settings
 from app.db.session import create_engine, session_factory
 from app.services.prompts import sync_prompts
@@ -60,6 +62,8 @@ def create_app(session_factory: async_sessionmaker | None = None) -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(jobs_router)
+    app.include_router(projects_router)
+    app.include_router(catalog_router)
     return app
 
 
