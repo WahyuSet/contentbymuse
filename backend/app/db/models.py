@@ -210,6 +210,9 @@ class Project(Base):
     target_max_s: Mapped[int] = mapped_column(Integer, default=40)
     selected_idea_id: Mapped[str | None] = mapped_column(String(26))
     active_script_id: Mapped[str | None] = mapped_column(String(26))
+    voice_provider_id: Mapped[str | None] = mapped_column(String(26))
+    voice_id: Mapped[str | None] = mapped_column(String(128))
+    voice_settings: Mapped[dict] = mapped_column(JSON, default=dict)
     settings: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -306,3 +309,51 @@ class AppSetting(Base):
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[object] = mapped_column(JSON)
+
+
+class Asset(Base):
+    __tablename__ = "asset"
+    __table_args__ = (
+        UniqueConstraint("project_id", "scene_id", "kind", "version"),
+        Index(
+            "uq_asset_selected",
+            "project_id",
+            text("coalesce(scene_id, '')"),
+            "kind",
+            unique=True,
+            sqlite_where=text("is_selected = 1"),
+            postgresql_where=text("is_selected"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(26), primary_key=True, default=new_ulid)
+    project_id: Mapped[str | None] = mapped_column(String(26), index=True)
+    scene_id: Mapped[str | None] = mapped_column(String(26), index=True)
+    kind: Mapped[str] = mapped_column(String(24))
+    version: Mapped[int] = mapped_column(Integer)
+    storage_key: Mapped[str] = mapped_column(String(512))
+    mime: Mapped[str] = mapped_column(String(64))
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    duration_s: Mapped[float | None] = mapped_column()
+    width: Mapped[int | None] = mapped_column(Integer)
+    height: Mapped[int | None] = mapped_column(Integer)
+    data: Mapped[dict | None] = mapped_column(JSON)
+    input_hash: Mapped[str] = mapped_column(String(64), index=True)
+    provider_id: Mapped[str | None] = mapped_column(String(26))
+    model: Mapped[str | None] = mapped_column(String(128))
+    params: Mapped[dict | None] = mapped_column(JSON)
+    is_selected: Mapped[bool] = mapped_column(Boolean, default=False)
+    job_id: Mapped[str | None] = mapped_column(String(26))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class VoiceCalibration(Base):
+    __tablename__ = "voice_calibration"
+
+    provider_id: Mapped[str] = mapped_column(String(26), primary_key=True)
+    voice_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    words_per_second: Mapped[float] = mapped_column(default=0.0)
+    samples: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
