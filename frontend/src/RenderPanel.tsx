@@ -21,12 +21,13 @@ export default function RenderPanel({ projectId }: { projectId: string }) {
     queryFn: fetchJobs,
     refetchInterval: 1000,
   });
-  const renderActive = (jobs.data ?? []).some(
+  const activeRenderJob = (jobs.data ?? []).find(
     (job) =>
       job.type === "render" &&
       job.project_id === projectId &&
       (job.status === "queued" || job.status === "processing"),
   );
+  const renderActive = activeRenderJob !== undefined;
   const start = useMutation({
     mutationFn: (force: boolean) => requestRender(projectId, force),
     onSuccess: () => {
@@ -40,11 +41,21 @@ export default function RenderPanel({ projectId }: { projectId: string }) {
     <section className="panel">
       <h2>Render</h2>
       {renderActive && (
-        <p className="panel-note">
-          Render sedang berjalan — video 9:16 dibuat dari gambar, suara, dan
-          subtitle scene. Di mesin tanpa GPU proses ini bisa makan beberapa
-          menit.
-        </p>
+        <>
+          <p className="panel-note">
+            Render sedang berjalan
+            {activeRenderJob.progress_message
+              ? ` — ${activeRenderJob.progress_message}`
+              : ""}
+          </p>
+          <div className="render-progress">
+            <div
+              className="render-progress-bar"
+              style={{ width: `${activeRenderJob.progress}%` }}
+            />
+          </div>
+          <p className="panel-note">{activeRenderJob.progress}%</p>
+        </>
       )}
       {info ? (
         <>

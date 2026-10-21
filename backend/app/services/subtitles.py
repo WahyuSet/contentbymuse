@@ -62,19 +62,47 @@ def _wrap(words: list[CueWord], style: dict) -> list[str] | None:
     return lines if 1 <= len(lines) <= 2 else None
 
 
+def _split_overlong(word: str, style: dict) -> list[str]:
+    """Pecah satu kata yang melampaui batas baris menjadi potongan yang sah,
+    agar tidak ada kata yang hilang atau meluber dari bingkai."""
+    max_chars = int(style["max_chars"])
+    size = int(style["size"])
+    max_px = float(style["max_width_px"])
+    pieces: list[str] = []
+    rest = word
+    while rest and (
+        len(rest) > max_chars or measure_text_px(rest, size) > max_px
+    ):
+        cut = min(max_chars, len(rest) - 1)
+        while cut > 1 and measure_text_px(rest[:cut], size) > max_px:
+            cut -= 1
+        pieces.append(rest[:cut])
+        rest = rest[cut:]
+    if rest:
+        pieces.append(rest)
+    return pieces or [word]
+
+
 def chunk_words(words, style: dict, emphasis: set[str] | None = None) -> list[Cue]:
     """Potong kata menjadi cue 2-4 kata (Spec §8.5): potong lebih awal pada
     tanda baca akhir kata; setiap cue harus terbungkus <=2 baris sah."""
     emphasis = {e.lower() for e in (emphasis or set())}
-    items = [
-        CueWord(
-            word=w.word,
-            start=w.start,
-            end=w.end,
-            emphasis=w.word.strip(".,!?;:\"'").lower() in emphasis,
-        )
-        for w in words
-    ]
+    items: list[CueWord] = []
+    for w in words:
+        flag = w.word.strip(".,!?;:\"'").lower() in emphasis
+        pieces = _split_overlong(w.word, style)
+        if len(pieces) == 1:
+            items.append(CueWord(word=w.word, start=w.start, end=w.end, emphasis=flag))
+            continue
+        span = max(w.end - w.start, 0.0)
+        total_len = sum(len(p) for p in pieces)
+        cursor = w.start
+        for piece in pieces:
+            dur = span * len(piece) / total_len if total_len else 0.0
+            items.append(
+                CueWord(word=piece, start=cursor, end=cursor + dur, emphasis=flag)
+            )
+            cursor += dur
     cues: list[Cue] = []
 
     def flush(group: list[CueWord]) -> None:
@@ -95,17 +123,17 @@ def chunk_words(words, style: dict, emphasis: set[str] | None = None) -> list[Cu
             flush(current)
             current = []
     if current:
-        # Sisa 1 kata digabung ke cue terakhir bila masih sah, agar tidak ada
-        # cue satu kata yang melanggar aturan 2-4 kata.
-        if len(current) == 1 and cues:
-            merged = cues[-1].words + current
-            wrapped = _wrap(merged, style)
-            if wrapped is not None and len(merged) <= 4:
-                cues[-1] = Cue(words=merged, lines=wrapped)
-            else:
-                cues.append(Cue(words=current, lines=_wrap(current, style) or []))
-        else:
-            cues.append(Cue(words=current, lines=_wrap(current, style) or []))
+        cues.append(Cue(words=current, lines=_wrap(current, style) or []))
+    # Seimbangkan: cue terakhir 1 kata meminjam kata terakhir cue sebelumnya
+    # ([4,1] -> [3,2]) selama kedua cue tetap terbungkus sah.
+    if len(cues) >= 2 and len(cues[-1].words) == 1 and len(cues[-2].words) >= 3:
+        moved = cues[-2].words[-1]
+        prev = cues[-2].words[:-1]
+        last = [moved, *cues[-1].words]
+        prev_wrap, last_wrap = _wrap(prev, style), _wrap(last, style)
+        if prev_wrap is not None and last_wrap is not None:
+            cues[-2] = Cue(words=prev, lines=prev_wrap)
+            cues[-1] = Cue(words=last, lines=last_wrap)
     return cues
 
 
@@ -145,7 +173,12 @@ def _srt_time(seconds: float) -> str:
 
 
 def _ass_escape(text: str) -> str:
-    return text.replace("{", "(").replace("}", ")").replace("\n", " ")
+    return (
+        text.replace("\\", "＼")
+        .replace("{", "(")
+        .replace("}", ")")
+        .replace("\n", " ")
+    )
 
 
 def _emphasis_tags(style: dict) -> tuple[str, str]:

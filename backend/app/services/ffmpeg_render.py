@@ -17,7 +17,14 @@ _ENCODER_CACHE: dict[str, tuple[str, list[str]]] = {}
 
 
 class RenderError(Exception):
-    """Kegagalan render dengan pesan yang aman ditampilkan ke pengguna."""
+    """Kegagalan render dengan pesan yang aman ditampilkan ke pengguna.
+
+    Render bersifat deterministik untuk masukan yang sama, jadi kegagalan
+    tidak diulang otomatis oleh worker (rencana Fase 6 Task 4): ulangi manual
+    lewat render paksa."""
+
+    kind = "RenderError"
+    retryable = False
 
 
 def detect_encoder(ffmpeg: str = "ffmpeg") -> tuple[str, list[str]]:
@@ -72,6 +79,7 @@ async def run_render(
     ass_path.write_text(build_ass(plan.cues, plan.subtitle_style), encoding="utf-8")
     srt_path.write_text(build_srt(plan.cues), encoding="utf-8")
 
+    timeout_s = max(600.0, plan.total_duration_s * 120)
     encoder_name, encoder_args = detect_encoder(ffmpeg)
     args = build_ffmpeg_command(
         plan,
@@ -99,15 +107,26 @@ async def run_render(
                 except ValueError:
                     continue
                 if progress_cb is not None:
-                    progress_cb(min(value / total_us, 1.0))
+                    try:
+                        progress_cb(min(value / total_us, 1.0))
+                    except Exception:  # noqa: BLE001, S110 - callback progres tak boleh membunuh render
+                        pass
 
     async def _read_stderr():
         assert process.stderr is not None
         async for line in process.stderr:
             stderr_chunks.append(line)
 
-    await asyncio.gather(_read_stdout(), _read_stderr())
-    returncode = await process.wait()
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(_read_stdout(), _read_stderr()), timeout=timeout_s
+        )
+        returncode = await asyncio.wait_for(process.wait(), timeout=30)
+    except TimeoutError:
+        process.kill()
+        raise RenderError(
+            f"Render melewati batas waktu {int(timeout_s)} detik dan dihentikan."
+        ) from None
     render_seconds = time.monotonic() - started
     if returncode != 0:
         tail = b"".join(stderr_chunks[-8:]).decode("utf-8", errors="replace")
@@ -127,7 +146,12 @@ async def run_render(
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.DEVNULL,
     )
-    if await thumb_proc.wait() != 0 or not thumb_path.exists():
+    try:
+        thumb_rc = await asyncio.wait_for(thumb_proc.wait(), timeout=60)
+    except TimeoutError:
+        thumb_proc.kill()
+        thumb_rc = -1
+    if thumb_rc != 0 or not thumb_path.exists():
         raise RenderError("Gagal mengambil bingkai thumbnail dari video.")
     warnings: list[str] = []
     if duration < 30 or duration > 40:

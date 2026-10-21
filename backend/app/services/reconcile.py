@@ -126,7 +126,13 @@ async def _reconcile_render(session, project) -> None:
     ).first()
     if active is not None:
         return
-    await queue.enqueue(session, type="render", input={}, project_id=project.id)
+    from sqlalchemy.exc import IntegrityError
+
+    try:
+        async with session.begin_nested():
+            await queue.enqueue(session, type="render", input={}, project_id=project.id)
+    except IntegrityError:
+        pass  # job render aktif dibuat pihak lain pada saat yang sama
 
 
 async def _reconcile_voice_production(session, project) -> None:

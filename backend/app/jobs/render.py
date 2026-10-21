@@ -102,7 +102,12 @@ async def run_render_job(
             )
         ).scalars().first()
         if existing is not None and not force:
-            return {"asset_id": existing.id, "cached": True}
+            video_file = await storage.local_path(existing.storage_key)
+            if video_file.exists():
+                if not existing.is_selected:
+                    await asset_service.select_asset(session, existing)
+                    await session.commit()
+                return {"asset_id": existing.id, "cached": True}
 
         scene_inputs: list[SceneInput] = []
         for scene, voice, image, timings in per_scene:
@@ -152,9 +157,12 @@ async def run_render_job(
     async def _flush_progress() -> None:
         while True:
             await asyncio.sleep(5)
-            await ctx.progress(
-                int(progress_state["fraction"] * 100), "Merender video…"
-            )
+            try:
+                await ctx.progress(
+                    int(progress_state["fraction"] * 100), "Merender video…"
+                )
+            except Exception:  # noqa: BLE001, S110 - progres gagal tulis tidak menghentikan render
+                pass
 
     flush_task = asyncio.create_task(_flush_progress())
     try:
@@ -164,6 +172,10 @@ async def run_render_job(
         )
     finally:
         flush_task.cancel()
+        try:
+            await flush_task
+        except asyncio.CancelledError:
+            pass
         shutil.rmtree(workdir, ignore_errors=True)
     await ctx.log(
         "info",

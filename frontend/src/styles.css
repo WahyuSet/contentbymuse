@@ -536,3 +536,18 @@ code {
   color: #146c33;
   font-weight: 600;
 }
+
+.render-progress {
+  height: 10px;
+  background: #efe9da;
+  border: 1px solid #d8d2c4;
+  border-radius: 999px;
+  overflow: hidden;
+  max-width: 420px;
+}
+
+.render-progress-bar {
+  height: 100%;
+  background: #1e9e4a;
+  transition: width 1s linear;
+}

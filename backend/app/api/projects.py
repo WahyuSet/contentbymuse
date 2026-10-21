@@ -410,13 +410,31 @@ async def request_render(
             "RenderUpToDate",
             "Video sudah sesuai keadaan terbaru; pakai force untuk membuat ulang.",
         )
-    job = await queue.enqueue(
-        session,
-        type="render",
-        input={"force": body.force},
-        project_id=project.id,
-        resource_key="render",
-    )
-    await session.commit()
+    from sqlalchemy.exc import IntegrityError
+
+    try:
+        async with session.begin_nested():
+            job = await queue.enqueue(
+                session,
+                type="render",
+                input={"force": body.force},
+                project_id=project.id,
+                resource_key="render",
+            )
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        active = (
+            await session.execute(
+                select(GenerationJob).where(
+                    GenerationJob.project_id == project.id,
+                    GenerationJob.type == "render",
+                    GenerationJob.status.in_(("queued", "processing")),
+                )
+            )
+        ).scalars().first()
+        if active is None:
+            raise
+        return {"job": JobOut.model_validate(active), "created": False}
     await session.refresh(job)
     return {"job": JobOut.model_validate(job), "created": True}
