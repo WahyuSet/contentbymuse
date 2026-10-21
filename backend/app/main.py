@@ -11,6 +11,7 @@ from app.api.errors import AppError, error_body
 from app.api.jobs import router as jobs_router
 from app.api.projects import router as projects_router
 from app.api.scripts import router as scripts_router
+from app.api.visual_styles import router as visual_styles_router
 from app.config import get_settings
 from app.db.session import create_engine, session_factory
 from app.services.prompts import sync_prompts
@@ -71,6 +72,7 @@ def create_app(session_factory: async_sessionmaker | None = None) -> FastAPI:
     app.include_router(projects_router)
     app.include_router(catalog_router)
     app.include_router(scripts_router)
+    app.include_router(visual_styles_router)
     return app
 
 

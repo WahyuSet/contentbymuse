@@ -32,6 +32,8 @@ class ProjectOut(BaseModel):
     voice_provider_id: str | None = None
     voice_id: str | None = None
     voice_settings: dict[str, Any] = {}
+    image_provider_id: str | None = None
+    visual_style_id: str | None = None
     settings: dict[str, Any]
     created_at: datetime
     updated_at: datetime
@@ -81,6 +83,8 @@ class ProjectPatch(BaseModel):
     voice_provider_id: str | None = None
     voice_id: str | None = None
     voice_settings: dict[str, Any] | None = None
+    image_provider_id: str | None = None
+    visual_style_id: str | None = None
 
 
 async def project_out(session: AsyncSession, project: Project) -> ProjectOut:
@@ -131,6 +135,26 @@ async def _check_voice_provider(session: AsyncSession, provider_id: str | None) 
     provider = await session.get(Provider, provider_id)
     if provider is None or provider.capability != "voice":
         raise AppError(422, "InvalidProvider", "Provider suara tidak ditemukan.")
+
+
+async def _check_image_provider(session: AsyncSession, provider_id: str | None) -> None:
+    if provider_id is None:
+        return
+    from app.db.models import Provider
+
+    provider = await session.get(Provider, provider_id)
+    if provider is None or provider.capability != "image":
+        raise AppError(422, "InvalidProvider", "Provider gambar tidak ditemukan.")
+
+
+async def _check_visual_style(session: AsyncSession, style_id: str | None) -> None:
+    if style_id is None:
+        return
+    from app.db.models import VisualStyle
+
+    style = await session.get(VisualStyle, style_id)
+    if style is None:
+        raise AppError(422, "InvalidVisualStyle", "Gaya visual tidak ditemukan.")
 
 
 @router.post("/projects", status_code=201, response_model=ProjectOut)
@@ -207,6 +231,12 @@ async def patch_project(project_id: str, body: ProjectPatch, session: SessionDep
     if "voice_provider_id" in data:
         await _check_voice_provider(session, data["voice_provider_id"])
         project.voice_provider_id = data["voice_provider_id"]
+    if "image_provider_id" in data:
+        await _check_image_provider(session, data["image_provider_id"])
+        project.image_provider_id = data["image_provider_id"]
+    if "visual_style_id" in data:
+        await _check_visual_style(session, data["visual_style_id"])
+        project.visual_style_id = data["visual_style_id"]
     if "settings" in data and data["settings"] is not None:
         merged = dict(project.settings or {})
         merged.update(data["settings"])

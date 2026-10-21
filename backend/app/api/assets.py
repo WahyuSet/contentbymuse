@@ -111,3 +111,62 @@ async def regenerate_voice(scene_id: str, session: SessionDep):
     await session.commit()
     await session.refresh(job)
     return {"job": JobOut.model_validate(job), "created": True}
+
+
+@router.post("/scenes/{scene_id}/image/regenerate", status_code=202)
+async def regenerate_image(scene_id: str, session: SessionDep):
+    from sqlalchemy.exc import IntegrityError
+
+    scene = await session.get(Scene, scene_id)
+    if scene is None:
+        raise NotFoundError("Scene tidak ditemukan.")
+    script = await session.get(Script, scene.script_id)
+    project = await session.get(Project, script.project_id) if script else None
+    if script is None or project is None or project.active_script_id != script.id:
+        raise AppError(
+            409, "ScriptNotActive", "Gambar hanya dibuat ulang untuk script aktif."
+        )
+    active = (
+        await session.execute(
+            select(GenerationJob).where(
+                GenerationJob.scene_id == scene.id,
+                GenerationJob.type == "image",
+                GenerationJob.status.in_(("queued", "processing")),
+            )
+        )
+    ).scalars().first()
+    if active is not None:
+        return {"job": JobOut.model_validate(active), "created": False}
+    expected = await ProviderRouter(session).expected_image(project)
+    resource_key = f"image:{expected.id}" if expected else "local"
+    max_attempts = (
+        1 if expected is not None and expected.quirks.get("retry_safe") is False else 3
+    )
+    try:
+        async with session.begin_nested():
+            job = await queue.enqueue(
+                session,
+                type="image",
+                input={"scene_id": scene.id, "force": True},
+                project_id=project.id,
+                scene_id=scene.id,
+                resource_key=resource_key,
+                max_attempts=max_attempts,
+            )
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        active = (
+            await session.execute(
+                select(GenerationJob).where(
+                    GenerationJob.scene_id == scene.id,
+                    GenerationJob.type == "image",
+                    GenerationJob.status.in_(("queued", "processing")),
+                )
+            )
+        ).scalars().first()
+        if active is None:
+            raise
+        return {"job": JobOut.model_validate(active), "created": False}
+    await session.refresh(job)
+    return {"job": JobOut.model_validate(job), "created": True}
