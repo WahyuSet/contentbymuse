@@ -53,6 +53,7 @@ async def render_hash_parts(
                 "transition": scene.transition,
                 "subtitle_override": scene.subtitle_override,
                 "emphasis_words": scene.emphasis_words,
+                "sfx_cues": scene.sfx_cues or [],
                 "voice": [voice.id, voice.version] if voice else None,
                 "image": [image.id, image.version] if image else None,
                 "timings": [timings.id, timings.version] if timings else None,
@@ -144,6 +145,7 @@ async def run_render_job(
                     subtitle_override=scene.subtitle_override,
                     voiceover=scene.voiceover,
                     emphasis_words=list(scene.emphasis_words or []),
+                    sfx_cues=list(scene.sfx_cues or []),
                 )
             )
 

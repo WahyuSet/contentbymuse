@@ -28,6 +28,7 @@ class SceneInput:
     subtitle_override: str | None = None
     voiceover: str = ""
     emphasis_words: list[str] = field(default_factory=list)
+    sfx_cues: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -44,12 +45,21 @@ class RenderScene:
 
 
 @dataclass
+class SfxEvent:
+    at_s: float
+    sfx_id: str
+    gain: float
+    kind: str  # "cue" | "transition"
+
+
+@dataclass
 class RenderPlan:
     width: int = 1080
     height: int = 1920
     fps: int = FPS
     scenes: list[RenderScene] = field(default_factory=list)
     cues: list = field(default_factory=list)
+    sfx_events: list[SfxEvent] = field(default_factory=list)
     subtitle_style: dict = field(default_factory=dict)
 
     @property
@@ -81,6 +91,7 @@ def _pick_motion(scene: SceneInput, previous: str | None) -> str:
 def build_render_plan(*, scenes: list[SceneInput], subtitle_style: dict) -> RenderPlan:
     """Rencana render murni (Spec §8.1-8.5): timeline berbingkai utuh, kata
     digeser ke waktu global, motion deterministik, cue subtitle global."""
+    from app.services import sfx_catalog
     from app.services.subtitles import chunk_words, proportional_words
 
     plan = RenderPlan(subtitle_style=dict(subtitle_style))
@@ -129,6 +140,34 @@ def build_render_plan(*, scenes: list[SceneInput], subtitle_style: dict) -> Rend
                 words=global_words,
             )
         )
+        for cue in scene.sfx_cues or []:
+            sfx_id = str(cue.get("sfx", ""))
+            if not sfx_catalog.is_valid_sfx(sfx_id):
+                continue
+            word = str(cue.get("word", "")).strip().lower()
+            at_s = start_s
+            for gw in global_words:
+                if gw.word.strip(".,!?;:\"'").lower() == word:
+                    at_s = gw.start
+                    break
+            gain = cue.get("gain")
+            plan.sfx_events.append(
+                SfxEvent(
+                    at_s=round(at_s, 3),
+                    sfx_id=sfx_id,
+                    gain=float(gain) if gain is not None else sfx_catalog.default_gain(sfx_id),
+                    kind="cue",
+                )
+            )
+        if index > 0:
+            plan.sfx_events.append(
+                SfxEvent(
+                    at_s=round(max(start_s - 0.15, 0.0), 3),
+                    sfx_id=sfx_catalog.TRANSITION_SFX,
+                    gain=sfx_catalog.TRANSITION_GAIN,
+                    kind="transition",
+                )
+            )
         if scene.subtitle_override:
             cue_words_in = proportional_words(
                 scene.subtitle_override, start_s, start_s + span

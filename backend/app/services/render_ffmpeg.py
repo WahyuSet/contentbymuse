@@ -50,6 +50,10 @@ def build_ffmpeg_command(
         # frame masukan).
         args += ["-i", scene.image_path]
         args += ["-i", scene.audio_path]
+    from app.services import sfx_catalog
+
+    for event in plan.sfx_events:
+        args += ["-i", str(sfx_catalog.sfx_path(event.sfx_id))]
 
     filters: list[str] = []
     has_fade = [
@@ -100,7 +104,30 @@ def build_ffmpeg_command(
 
     audio_inputs = "".join(f"[a{i}]" for i in range(len(plan.scenes)))
     filters.append(f"{audio_inputs}concat=n={len(plan.scenes)}:v=0:a=1[acat]")
-    filters.append("[acat]loudnorm=I=-14:TP=-1.5:LRA=11[aout]")
+    if plan.sfx_events:
+        # Event SFX ditunda ke waktu globalnya lalu dicampur di bawah narasi;
+        # loudnorm tetap tahap terakhir agar level akhir konsisten.
+        mix_labels = ["[acat]"]
+        base_index = len(plan.scenes) * 2
+        for k, event in enumerate(plan.sfx_events):
+            delay_ms = int(round(event.at_s * 1000))
+            filters.append(
+                f"[{base_index + k}:a]aformat=sample_rates=48000:"
+                f"channel_layouts=stereo,adelay={delay_ms}|{delay_ms},"
+                f"volume={event.gain:.2f}[sfx{k}]"
+            )
+            mix_labels.append(f"[sfx{k}]")
+        filters.append(
+            "[acat]aformat=sample_rates=48000:channel_layouts=stereo[acatf]"
+        )
+        mix_labels[0] = "[acatf]"
+        filters.append(
+            f"{''.join(mix_labels)}amix=inputs={len(mix_labels)}:"
+            f"duration=first:normalize=0[amix]"
+        )
+        filters.append("[amix]loudnorm=I=-14:TP=-1.5:LRA=11[aout]")
+    else:
+        filters.append("[acat]loudnorm=I=-14:TP=-1.5:LRA=11[aout]")
     filters.append(
         f"[{current_label}]ass=filename='{_escape_filter_path(ass_path)}'"
         f":fontsdir='{_escape_filter_path(fonts_dir)}'[vout]"

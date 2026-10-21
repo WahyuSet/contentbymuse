@@ -115,3 +115,33 @@ def test_measure_and_long_line_split():
     for cue in cues:
         for line in cue.lines:
             assert len(line) <= 28
+
+
+def test_plan_sfx_events_from_cues_and_transitions():
+    from app.services.render_plan import SceneInput, build_render_plan
+
+    def scene(pos, vo, cues):
+        words = [
+            WordTiming(word=w, start=i * 0.4, end=i * 0.4 + 0.3)
+            for i, w in enumerate(vo.split())
+        ]
+        return SceneInput(
+            id=f"s{pos}", position=pos, image_path="/i.png",
+            audio_path="/a.mp3", trim=(0.0, 3.0), clip_duration_s=3.0,
+            words=words, visual_type="character", voiceover=vo, sfx_cues=cues,
+        )
+
+    plan = build_render_plan(
+        scenes=[
+            scene(1, "Indeks pasar anjlok tajam", [{"sfx": "fall", "word": "anjlok"}]),
+            scene(2, "Semua orang terdiam sekarang", [{"sfx": "ding", "word": "hantu"}]),
+        ],
+        subtitle_style=STYLE,
+    )
+    kinds = [(e.kind, e.sfx_id) for e in plan.sfx_events]
+    assert ("cue", "fall") in kinds
+    assert ("transition", "whoosh") in kinds
+    ding = [e for e in plan.sfx_events if e.sfx_id == "ding"][0]
+    assert ding.at_s >= plan.scenes[1].start_s - 0.01  # kata tak ketemu -> awal scene
+    fall = [e for e in plan.sfx_events if e.sfx_id == "fall"][0]
+    assert 0.7 < fall.at_s < 0.9  # kata ke-3 pada 0.4 dtk/kata
