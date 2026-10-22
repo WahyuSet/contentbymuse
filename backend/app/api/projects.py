@@ -394,6 +394,87 @@ async def get_metadata(project_id: str, session: SessionDep):
     }
 
 
+class MetadataReviseIn(BaseModel):
+    title: str
+    description: str | None = None
+    hashtags: list[str] | None = None
+    fb_caption: str | None = None
+
+
+@router.post("/projects/{project_id}/metadata/revise")
+async def revise_metadata(
+    project_id: str, body: MetadataReviseIn, session: SessionDep
+):
+    """Timpa teks metadata terpilih (judul dkk.) — dipakai agen produksi untuk
+    memperbaiki judul hasil generator menjadi hook yang kuat sebelum terbit.
+    Manifest rekor yang belum naik (queued/awaiting) ikut diperbarui;
+    render_id/script_id di data aset tidak disentuh."""
+    import json as json_mod
+
+    from app.config import get_settings
+    from app.db.models import Asset, PublishRecord
+    from app.storage.local import LocalStorage
+
+    title = body.title.strip()
+    if not title or len(title) > 100:
+        raise AppError(
+            422, "MetadataTitle", "Judul wajib 1–100 karakter."
+        )
+    asset = (
+        await session.execute(
+            select(Asset).where(
+                Asset.project_id == project_id,
+                Asset.kind == "metadata",
+                Asset.is_selected.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if asset is None:
+        raise NotFoundError("Metadata terpilih tidak ditemukan.")
+    data = dict(asset.data or {})
+    data["title"] = title
+    if body.description is not None:
+        data["description"] = body.description
+    if body.hashtags is not None:
+        data["hashtags"] = body.hashtags
+    if body.fb_caption is not None:
+        data["fb_caption"] = body.fb_caption
+    asset.data = data
+    await session.commit()
+
+    storage = LocalStorage(get_settings().storage_path)
+    records = (
+        await session.execute(
+            select(PublishRecord).where(
+                PublishRecord.project_id == project_id,
+                PublishRecord.status.in_(("queued", "awaiting_upload")),
+            )
+        )
+    ).scalars().all()
+    touched = 0
+    for record in records:
+        path = await storage.local_path(f"publish/{record.id}/manifest.json")
+        if not path.exists():
+            continue
+        try:
+            manifest = json_mod.loads(path.read_text())
+        except (OSError, json_mod.JSONDecodeError):
+            continue
+        manifest["title"] = data["title"]
+        manifest["description"] = data.get("description")
+        manifest["hashtags"] = data.get("hashtags")
+        manifest["fb_caption"] = data.get("fb_caption")
+        path.write_text(json_mod.dumps(manifest, indent=2))
+        touched += 1
+    return {
+        "title": data["title"],
+        "description": data.get("description"),
+        "hashtags": data.get("hashtags"),
+        "fb_caption": data.get("fb_caption"),
+        "manifests_updated": touched,
+    }
+
+
 @router.post("/projects/{project_id}/render", status_code=202)
 async def request_render(
     project_id: str, body: RenderRequest, session: SessionDep

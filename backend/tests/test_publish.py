@@ -162,6 +162,12 @@ async def test_publish_handler_fails_on_script_mismatch(factory):
 
 
 def _api_client(tmp_path):
+    import os
+
+    os.environ["STORAGE_PATH"] = str(tmp_path / "storage")
+    from app.config import get_settings
+
+    get_settings.cache_clear()
     engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path}/api.db")
 
     async def _setup():
@@ -181,6 +187,17 @@ def _api_client(tmp_path):
                 platform="youtube", status="awaiting_upload",
             )
             session.add(record)
+            session.add(Asset(
+                project_id="01JPROJECT", scene_id=None, kind="metadata",
+                storage_key="assets/x/metadata.json",
+                mime="application/json", input_hash="mh", is_selected=True,
+                version=1,
+                data={"render_id": "01JRENDER", "script_id": "01JSCRIPT",
+                      "title": "Judul Lama — Penonton Wajib Tahu!",
+                      "description": "Deskripsi lama.",
+                      "hashtags": ["tikusberdasi"],
+                      "fb_caption": "Caption lama."},
+            ))
             await session.commit()
             return maker, record.id
 
@@ -295,3 +312,31 @@ async def test_reconcile_supersedes_old_render_and_reaps_stale_upload(factory):
         new = [r for r in records if r.render_id == render2_id]
         assert {r.status for r in old} == {"superseded"}
         assert len(new) == 2
+
+
+def test_revise_metadata_updates_asset_and_manifest(tmp_path):
+    client, record_id = _api_client(tmp_path)
+    manifest_dir = tmp_path / "storage" / "publish" / record_id
+    manifest_dir.mkdir(parents=True)
+    (manifest_dir / "manifest.json").write_text(json.dumps({
+        "publish_id": record_id, "title": "Judul Lama — Penonton Wajib Tahu!",
+        "description": "Deskripsi lama.", "hashtags": ["tikusberdasi"],
+        "fb_caption": "Caption lama.",
+    }))
+    response = client.post(
+        "/api/projects/01JPROJECT/metadata/revise",
+        json={"title": "OJK Denda 3 Emiten, Total 2,1 T!!",
+              "fb_caption": "OJK denda 3 emiten, total 2,1 T! #tikusberdasi"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["title"] == "OJK Denda 3 Emiten, Total 2,1 T!!"
+    assert body["manifests_updated"] == 1
+    manifest = json.loads((manifest_dir / "manifest.json").read_text())
+    assert manifest["title"] == "OJK Denda 3 Emiten, Total 2,1 T!!"
+    assert manifest["fb_caption"].startswith("OJK denda 3 emiten")
+    shown = client.get("/api/projects/01JPROJECT/metadata")
+    assert shown.json()["title"] == "OJK Denda 3 Emiten, Total 2,1 T!!"
+    bad = client.post("/api/projects/01JPROJECT/metadata/revise",
+                      json={"title": "   "})
+    assert bad.status_code == 422
