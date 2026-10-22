@@ -17,7 +17,10 @@ SFX_CATALOG: dict[str, dict] = {
 }
 
 TRANSITION_SFX = "whoosh"
-TRANSITION_GAIN = 0.3
+# 0.85 (naik dari 0.3 pada 2026-10-23): pada gain lama whoosh tertutup narasi
+# yang mengalir tanpa jeda sehingga transisi praktis tak terdengar (temuan
+# pemilik); kini dipadukan peredaman narasi sesaat di titik potong.
+TRANSITION_GAIN = 0.85
 
 
 def is_valid_sfx(sfx_id: str) -> bool:

@@ -117,9 +117,23 @@ def build_ffmpeg_command(
                 f"volume={event.gain:.2f}[sfx{k}]"
             )
             mix_labels.append(f"[sfx{k}]")
-        filters.append(
-            "[acat]aformat=sample_rates=48000:channel_layouts=stereo[acatf]"
-        )
+        # Redam narasi sesaat di tiap titik potong scene (turun ke 0.45 pada
+        # jendela -0.05..+0.35 dtk di sekitar batas) supaya whoosh transisi
+        # terdengar menonjol; tanpa ini whoosh tertutup narasi yang mengalir.
+        cuts = [s.start_s for s in plan.scenes[1:]]
+        if cuts:
+            expr = "*".join(
+                f"if(between(t,{c - 0.05:.3f},{c + 0.35:.3f}),0.45,1)"
+                for c in cuts
+            )
+            filters.append(f"[acat]volume=volume='{expr}':eval=frame[adip]")
+            filters.append(
+                "[adip]aformat=sample_rates=48000:channel_layouts=stereo[acatf]"
+            )
+        else:
+            filters.append(
+                "[acat]aformat=sample_rates=48000:channel_layouts=stereo[acatf]"
+            )
         mix_labels[0] = "[acatf]"
         filters.append(
             f"{''.join(mix_labels)}amix=inputs={len(mix_labels)}:"

@@ -54,6 +54,14 @@ def test_command_shape_cut():
     assert "h264_nvenc" not in joined
 
 
+def test_command_dips_narration_at_scene_cuts():
+    plan = build_render_plan(scenes=[_scene(1), _scene(2)], subtitle_style=STYLE)
+    joined = " ".join(_cmd(plan))
+    cut = plan.scenes[1].start_s
+    assert f"if(between(t,{cut - 0.05:.3f},{cut + 0.35:.3f}),0.45,1)" in joined
+    assert ":eval=frame[adip]" in joined
+
+
 def test_command_crossfade_uses_xfade_and_tpad():
     plan = build_render_plan(
         scenes=[_scene(1), _scene(2, transition="crossfade")],
