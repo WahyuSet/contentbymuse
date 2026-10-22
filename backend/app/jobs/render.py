@@ -114,9 +114,11 @@ async def run_render_job(
         for scene, voice, image, timings in per_scene:
             trim = None
             if voice.data and voice.data.get("trim"):
+                # Bentuk kanonis dari media_probe: {"start_s", "end_s"}
+                # (konsumen lain — align, voice — memakai kunci yang sama).
                 trim = (
-                    float(voice.data["trim"]["start"]),
-                    float(voice.data["trim"]["end"]),
+                    float(voice.data["trim"]["start_s"]),
+                    float(voice.data["trim"]["end_s"]),
                 )
             if timings is not None and timings.data and timings.data.get("words"):
                 words = [

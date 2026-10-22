@@ -52,7 +52,10 @@ def world(tmp_path, monkeypatch):
                     kind=kind, storage_key=key, mime=mime, size_bytes=16,
                     duration_s=3.0 if kind == "voice_clip" else None,
                     input_hash=f"hash-{kind}",
-                    data={"trim": {"start": 0.0, "end": 3.0}}
+                    # Bentuk kanonis media_probe — regresi bug 2026-10-22:
+                    # render.py sempat membaca "start"/"end" dan KeyError
+                    # pada clip pertama yang benar-benar punya trim.
+                    data={"trim": {"start_s": 0.0, "end_s": 3.0}}
                     if kind == "voice_clip"
                     else {},
                 )
