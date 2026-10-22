@@ -340,3 +340,125 @@ def test_revise_metadata_updates_asset_and_manifest(tmp_path):
     bad = client.post("/api/projects/01JPROJECT/metadata/revise",
                       json={"title": "   "})
     assert bad.status_code == 422
+
+
+async def _seed_reap_case(factory):
+    """Dua project, rekor di tiap status: hanya uploading basi yang boleh
+    kembali ke awaiting_upload."""
+    from datetime import UTC, datetime, timedelta
+
+    async with factory() as session:
+        pids = []
+        for title in ("Proyek A", "Proyek B"):
+            project = Project(title=title, topic="uji")
+            session.add(project)
+            await session.flush()
+            pids.append(project.id)
+        old = datetime.now(UTC) - timedelta(hours=2)
+        recs = {}
+        recs["stale_a"] = PublishRecord(
+            project_id=pids[0], render_id="RA", platform="youtube",
+            status="uploading",
+        )
+        recs["stale_b"] = PublishRecord(
+            project_id=pids[1], render_id="RB", platform="facebook",
+            status="uploading",
+        )
+        recs["fresh"] = PublishRecord(
+            project_id=pids[0], render_id="RC", platform="facebook",
+            status="uploading",
+        )
+        recs["published"] = PublishRecord(
+            project_id=pids[0], render_id="RD", platform="youtube",
+            status="published", url="https://youtu.be/x",
+        )
+        recs["failed"] = PublishRecord(
+            project_id=pids[1], render_id="RE", platform="youtube",
+            status="failed", error="x",
+        )
+        recs["awaiting"] = PublishRecord(
+            project_id=pids[0], render_id="RF", platform="youtube",
+            status="awaiting_upload",
+        )
+        for rec in recs.values():
+            session.add(rec)
+        await session.flush()
+        for key in ("stale_a", "stale_b"):
+            recs[key].updated_at = old
+        ids = {k: r.id for k, r in recs.items()}
+        await session.commit()
+    return ids
+
+
+async def test_reap_stale_uploads_service_cross_project(factory):
+    from app.services.reconcile import reap_stale_uploads
+
+    ids = await _seed_reap_case(factory)
+    async with factory() as session:
+        reaped = await reap_stale_uploads(session)
+    assert reaped == 2
+    async with factory() as session:
+        got = {
+            k: (await session.get(PublishRecord, rid)).status
+            for k, rid in ids.items()
+        }
+    assert got["stale_a"] == "awaiting_upload"
+    assert got["stale_b"] == "awaiting_upload"
+    assert got["fresh"] == "uploading"
+    assert got["published"] == "published"
+    assert got["failed"] == "failed"
+    assert got["awaiting"] == "awaiting_upload"
+
+
+def test_reap_stale_endpoint(tmp_path):
+    import os
+
+    os.environ["STORAGE_PATH"] = str(tmp_path / "storage")
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path}/reap.db")
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+
+    async def _setup():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    asyncio.run(_setup())
+
+    async def _seed():
+        async with maker() as session:
+            from datetime import UTC, datetime, timedelta
+
+            project = Project(title="Proyek Reap", topic="uji")
+            session.add(project)
+            await session.flush()
+            stale = PublishRecord(
+                project_id=project.id, render_id="R1", platform="facebook",
+                status="uploading",
+            )
+            fresh = PublishRecord(
+                project_id=project.id, render_id="R1", platform="youtube",
+                status="uploading",
+            )
+            session.add_all([stale, fresh])
+            await session.flush()
+            stale.updated_at = datetime.now(UTC) - timedelta(hours=1)
+            await session.commit()
+            return stale.id, fresh.id
+
+    stale_id, fresh_id = asyncio.run(_seed())
+    client = TestClient(create_app(session_factory=maker))
+    resp = client.post("/api/publish/reap-stale")
+    assert resp.status_code == 200
+    assert resp.json() == {"reaped": 1}
+
+    async def _check():
+        async with maker() as session:
+            s = await session.get(PublishRecord, stale_id)
+            f = await session.get(PublishRecord, fresh_id)
+            return s.status, f.status
+
+    assert asyncio.run(_check()) == ("awaiting_upload", "uploading")
+    # Kosong berikutnya: tidak ada yang dilepas lagi.
+    assert client.post("/api/publish/reap-stale").json() == {"reaped": 0}

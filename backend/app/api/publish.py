@@ -8,7 +8,7 @@ from app.api.errors import AppError, NotFoundError
 from app.api.jobs import FactoryDep, SessionDep
 from app.config import get_settings
 from app.db.models import Asset, PublishRecord
-from app.services.reconcile import reconcile
+from app.services.reconcile import reap_stale_uploads, reconcile
 from app.storage.local import LocalStorage
 
 router = APIRouter(prefix="/api", tags=["publish"])
@@ -83,6 +83,21 @@ async def _load_record(session, record_id: str) -> PublishRecord:
     if record is None:
         raise NotFoundError("Rekor publish tidak ditemukan.")
     return record
+
+
+class ReapStaleOut(BaseModel):
+    reaped: int
+
+
+@router.post("/publish/reap-stale", response_model=ReapStaleOut)
+async def reap_stale_uploads_endpoint(session: SessionDep):
+    """Pelepas klaim upload basi secara berkala, dipanggil eksekutor setiap
+    lari: rekor 'uploading' yang ditinggal eksekutor mati (lease
+    UPLOAD_LEASE_MINUTES habis) kembali ke awaiting_upload — tanpa menunggu
+    ada job worker yang selesai (celah 2026-10-22: antrean job kosong membuat
+    rekor basi macet selamanya)."""
+    reaped = await reap_stale_uploads(session)
+    return ReapStaleOut(reaped=reaped)
 
 
 @router.post("/publish/{record_id}/claim", response_model=PublishOut)

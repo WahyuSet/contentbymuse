@@ -151,6 +151,43 @@ PUBLISH_MAX_JOBS_PER_RECORD = 3
 UPLOAD_LEASE_MINUTES = 30
 
 
+async def reap_stale_uploads(session) -> int:
+    """Melepas klaim upload basi di SEMUA project: rekor 'uploading' yang
+    updated_at-nya lebih tua dari UPLOAD_LEASE_MINUTES kembali ke
+    awaiting_upload.
+
+    Berbeda dengan _reconcile_publish (yang hanya berjalan per project saat
+    sebuah job worker selesai), fungsi ini mandiri dan dipanggil berkala oleh
+    eksekutor lewat endpoint /api/publish/reap-stale. Celah 2026-10-22: saat
+    antrean job worker kosong, pelepasan klaim basi tidak pernah berjalan
+    sehingga rekor 'uploading' yang ditinggal eksekutor mati macet selamanya.
+    """
+    from datetime import UTC, timedelta
+
+    from sqlalchemy import select
+
+    from app.db.models import PublishRecord, utcnow
+
+    now = utcnow()
+    cutoff = now - timedelta(minutes=UPLOAD_LEASE_MINUTES)
+    rows = (
+        await session.execute(
+            select(PublishRecord).where(PublishRecord.status == "uploading")
+        )
+    ).scalars().all()
+    reaped = 0
+    for rec in rows:
+        updated = rec.updated_at
+        if updated is not None and updated.tzinfo is None:
+            updated = updated.replace(tzinfo=UTC)  # SQLite: naive = UTC
+        if updated is not None and updated < cutoff:
+            rec.status = "awaiting_upload"
+            reaped += 1
+    if reaped:
+        await session.commit()
+    return reaped
+
+
 async def _reconcile_publish(session, project) -> None:
     """Full-auto publish (keputusan pemilik): begitu render + thumbnail +
     metadata terpilih lengkap DAN metadata cocok dengan render & script
@@ -178,27 +215,17 @@ async def _reconcile_publish(session, project) -> None:
     render = await _selected("render")
     if render is None:
         return
-    from datetime import UTC, timedelta
 
-    from app.db.models import utcnow
-
-    now = utcnow()
-    changed = False
+    # Klaim basi dilepas di sini juga (jalan lama, per project, saat job
+    # selesai), tetapi pelepas utama kini berkala lewat endpoint
+    # /api/publish/reap-stale yang tidak bergantung pada aktivitas job.
+    changed = await reap_stale_uploads(session) > 0
     all_records = (
         await session.execute(
             select(PublishRecord).where(PublishRecord.project_id == project.id)
         )
     ).scalars().all()
     for rec in all_records:
-        if rec.status == "uploading":
-            updated = rec.updated_at
-            if updated is not None and updated.tzinfo is None:
-                updated = updated.replace(tzinfo=UTC)
-            if updated is not None and updated < now - timedelta(
-                minutes=UPLOAD_LEASE_MINUTES
-            ):
-                rec.status = "awaiting_upload"
-                changed = True
         if rec.render_id != render.id and rec.status in (
             "queued",
             "awaiting_upload",
