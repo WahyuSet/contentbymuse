@@ -4,11 +4,15 @@ from pathlib import Path
 SFX_DIR = Path(__file__).resolve().parent.parent / "assets" / "sfx"
 
 # id -> (nama tampil Bahasa Indonesia, gain bawaan 0..1, durasi detik)
-# SFX EVENT (ding/boom/pop/cash/fall/drum/scratch/sparkle) DIHAPUS pada
-# 2026-10-23 atas perintah pemilik — berkas WAV-nya dibuang dan entri
-# katalognya dicabut; pemilik akan mengirim berkas event baru, daftarkan
-# kembali di sini saat berkasnya tiba. Yang tersisa hanya whoosh transisi.
+# SFX event sintesis lama (pop/cash/fall/drum/scratch/sparkle dkk.) DIHAPUS
+# pada 2026-10-23 atas perintah pemilik dan diganti berkas kirimannya:
+# ding, boom, dan punch di bawah ini semuanya berkas pemilik (dipangkas dari
+# mp3 kiriman, dikonversi WAV 48kHz stereo). Jangan timpa lewat
+# scripts/build_sfx_library.py — resep sintesisnya hanya cadangan.
 SFX_CATALOG: dict[str, dict] = {
+    "ding": {"name": "Denting", "gain": 0.6, "duration_s": 1.25},
+    "boom": {"name": "Dentuman", "gain": 0.6, "duration_s": 1.2},
+    "punch": {"name": "Pukulan", "gain": 0.6, "duration_s": 0.33},
     # whoosh.wav = berkas kiriman pemilik (2026-10-23), sudah dipangkas dari
     # mp3 0,98 dtk (isi suara efektif ~0,23 dtk) menjadi WAV 0,28 dtk.
     # Jangan timpa lewat scripts/build_sfx_library.py — resep sintesisnya

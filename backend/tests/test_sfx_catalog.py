@@ -2,9 +2,8 @@ from app.services import sfx_catalog
 
 
 def test_catalog_files_exist():
-    # Sejak 2026-10-23 katalog hanya berisi whoosh transisi; SFX event
-    # dihapus menunggu berkas baru dari pemilik.
-    assert set(sfx_catalog.SFX_CATALOG) == {"whoosh"}
+    # Katalog = whoosh transisi + SFX event kiriman pemilik (2026-10-23).
+    assert set(sfx_catalog.SFX_CATALOG) == {"whoosh", "ding", "boom", "punch"}
     for sfx_id in sfx_catalog.SFX_CATALOG:
         path = sfx_catalog.sfx_path(sfx_id)
         assert path.exists() and path.stat().st_size > 1000
@@ -12,9 +11,12 @@ def test_catalog_files_exist():
 
 def test_validity_and_gain():
     assert sfx_catalog.is_valid_sfx("whoosh")
-    assert not sfx_catalog.is_valid_sfx("ding")
+    assert sfx_catalog.is_valid_sfx("ding")
+    assert sfx_catalog.is_valid_sfx("boom")
+    assert sfx_catalog.is_valid_sfx("punch")
+    assert not sfx_catalog.is_valid_sfx("pop")
     assert not sfx_catalog.is_valid_sfx("ledakan-besar")
-    assert 0 < sfx_catalog.default_gain("whoosh") <= 1
+    assert 0 < sfx_catalog.default_gain("boom") <= 1
 
 
 def test_sanitize_filters_and_clamps():
