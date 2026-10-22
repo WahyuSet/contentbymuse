@@ -16,10 +16,21 @@ from app.services.image_normalize import ImageNormalizeError, normalize_to_portr
 from app.services.styles_seed import expected_style
 from app.storage.local import LocalStorage
 
+_QUESTION_OPENERS = {"kenapa", "mengapa", "apa", "bagaimana", "kapan", "siapa"}
+_WEAK_TAIL = {"di", "ke", "dari", "yang", "dan", "itu", "ini", "kok", "sih", "pada"}
+
 
 def _short_title(title: str, max_words: int = 5) -> str:
-    words = title.replace(":", " ").split()
-    return " ".join(words[:max_words]).upper()
+    """Teks thumbnail cadangan dari judul: buang kata tanya pembuka dan kata
+    lemah di ujung supaya frasanya terasa utuh, bukan potongan kalimat.
+    Teks utama tetap yang ditulis agen produksi lewat endpoint revise."""
+    words = title.replace(":", " ").replace(",", " ").split()
+    while words and words[0].lower().strip("?") in _QUESTION_OPENERS:
+        words.pop(0)
+    words = words[:max_words]
+    while words and words[-1].lower() in _WEAK_TAIL:
+        words.pop()
+    return " ".join(words).upper()
 
 
 def build_thumbnail_prompt(style, hook_visual: str, title_text: str) -> str:

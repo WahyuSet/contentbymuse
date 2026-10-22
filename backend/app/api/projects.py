@@ -399,6 +399,7 @@ class MetadataReviseIn(BaseModel):
     description: str | None = None
     hashtags: list[str] | None = None
     fb_caption: str | None = None
+    thumbnail_text: str | None = None
 
 
 @router.post("/projects/{project_id}/metadata/revise")
@@ -420,6 +421,13 @@ async def revise_metadata(
         raise AppError(
             422, "MetadataTitle", "Judul wajib 1–100 karakter."
         )
+    thumb_text = None
+    if body.thumbnail_text is not None:
+        thumb_text = body.thumbnail_text.strip()
+        if not thumb_text or len(thumb_text) > 60:
+            raise AppError(
+                422, "ThumbnailText", "Teks thumbnail wajib 1–60 karakter."
+            )
     asset = (
         await session.execute(
             select(Asset).where(
@@ -466,12 +474,43 @@ async def revise_metadata(
         manifest["fb_caption"] = data.get("fb_caption")
         path.write_text(json_mod.dumps(manifest, indent=2))
         touched += 1
+
+    thumbnail_updated = False
+    if thumb_text is not None:
+        # Komposit ulang teks thumbnail dari gambar mentah (tanpa teks) milik
+        # aset thumbnail terpilih; berkas tujuan sama agar manifest tetap sah.
+        thumb = (
+            await session.execute(
+                select(Asset).where(
+                    Asset.project_id == project_id,
+                    Asset.kind == "thumbnail",
+                    Asset.is_selected.is_(True),
+                )
+            )
+        ).scalar_one_or_none()
+        if thumb is not None:
+            tdata = dict(thumb.data or {})
+            raw_key = tdata.get("raw_key")
+            if raw_key:
+                raw_path = await storage.local_path(raw_key)
+                if raw_path.exists():
+                    from app.services.thumbnail_text import draw_title_text
+
+                    final_path = await storage.local_path(thumb.storage_key)
+                    final_path.write_bytes(
+                        draw_title_text(raw_path.read_bytes(), thumb_text)
+                    )
+                    tdata["title_text"] = thumb_text.upper()
+                    thumb.data = tdata
+                    await session.commit()
+                    thumbnail_updated = True
     return {
         "title": data["title"],
         "description": data.get("description"),
         "hashtags": data.get("hashtags"),
         "fb_caption": data.get("fb_caption"),
         "manifests_updated": touched,
+        "thumbnail_updated": thumbnail_updated,
     }
 
 

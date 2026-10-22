@@ -198,6 +198,15 @@ def _api_client(tmp_path):
                       "hashtags": ["tikusberdasi"],
                       "fb_caption": "Caption lama."},
             ))
+            session.add(Asset(
+                project_id="01JPROJECT", scene_id=None, kind="thumbnail",
+                storage_key="assets/x/thumbnail-v1.png",
+                mime="image/png", input_hash="th", is_selected=True,
+                version=1,
+                data={"render_id": "01JRENDER",
+                      "raw_key": "assets/x/thumbnail-raw-v1.png",
+                      "title_text": "KENAPA POLRI MENETAPKAN 11"},
+            ))
             await session.commit()
             return maker, record.id
 
@@ -504,3 +513,35 @@ async def test_reconcile_reprepares_after_upload_failure_retry(factory):
         ]
         assert len(mine) == 2
         assert sum(1 for j in mine if j.status == "queued") == 1
+
+
+def test_revise_metadata_recomposites_thumbnail_text(tmp_path):
+    from PIL import Image
+
+    client, _record_id = _api_client(tmp_path)
+    raw = tmp_path / "storage" / "assets" / "x" / "thumbnail-raw-v1.png"
+    final = tmp_path / "storage" / "assets" / "x" / "thumbnail-v1.png"
+    raw.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (1080, 1920), (250, 246, 238)).save(raw)
+    Image.new("RGB", (1080, 1920), (250, 246, 238)).save(final)
+    before = final.read_bytes()
+    response = client.post(
+        "/api/projects/01JPROJECT/metadata/revise",
+        json={"title": "Polri Tetapkan 11 Korporasi Tersangka Karhutla, 3 Asing!!",
+              "thumbnail_text": "11 Korporasi Tersangka!"},
+    )
+    assert response.status_code == 200
+    assert response.json()["thumbnail_updated"] is True
+    assert final.read_bytes() != before  # teks baru benar-benar terkomposit
+    import sqlite3
+
+    db = sqlite3.connect(tmp_path / "api.db")
+    row = db.execute(
+        "select data from asset where kind='thumbnail' and is_selected=1"
+    ).fetchone()
+    assert "11 KORPORASI TERSANGKA!" in row[0]
+    again = client.post(
+        "/api/projects/01JPROJECT/metadata/revise",
+        json={"title": "Judul Lain", "thumbnail_text": "   "},
+    )
+    assert again.status_code == 422
