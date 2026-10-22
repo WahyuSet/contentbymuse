@@ -143,8 +143,11 @@ def test_plan_sfx_events_from_cues_and_transitions():
     assert ("transition", "whoosh") in kinds
     transisi = next(e for e in plan.sfx_events if e.kind == "transition")
     # Whoosh transisi harus menonjol (gain tinggi) dan terpusat di titik potong.
+    from app.services import sfx_catalog
+
+    half = sfx_catalog.SFX_CATALOG["whoosh"]["duration_s"] / 2
     assert transisi.gain == 0.85
-    assert abs(transisi.at_s - (plan.scenes[1].start_s - 0.22)) < 0.01
+    assert abs(transisi.at_s - (plan.scenes[1].start_s - half)) < 0.01
     ding = next(e for e in plan.sfx_events if e.sfx_id == "ding")
     assert ding.at_s >= plan.scenes[1].start_s - 0.01  # kata tak ketemu -> awal scene
     fall = next(e for e in plan.sfx_events if e.sfx_id == "fall")

@@ -7,7 +7,11 @@ SFX_DIR = Path(__file__).resolve().parent.parent / "assets" / "sfx"
 SFX_CATALOG: dict[str, dict] = {
     "ding": {"name": "Denting", "gain": 0.5, "duration_s": 0.5},
     "boom": {"name": "Dentuman", "gain": 0.7, "duration_s": 0.8},
-    "whoosh": {"name": "Desis transisi", "gain": 0.35, "duration_s": 0.45},
+    # whoosh.wav = berkas kiriman pemilik (2026-10-23), sudah dipangkas dari
+    # mp3 0,98 dtk (isi suara efektif ~0,23 dtk) menjadi WAV 0,28 dtk.
+    # Jangan timpa lewat scripts/build_sfx_library.py — resep sintesisnya
+    # hanya cadangan.
+    "whoosh": {"name": "Desis transisi", "gain": 0.35, "duration_s": 0.28},
     "pop": {"name": "Letupan", "gain": 0.5, "duration_s": 0.12},
     "cash": {"name": "Denting koin", "gain": 0.55, "duration_s": 0.35},
     "fall": {"name": "Meluncur turun", "gain": 0.55, "duration_s": 0.6},

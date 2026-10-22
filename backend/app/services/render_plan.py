@@ -160,12 +160,14 @@ def build_render_plan(*, scenes: list[SceneInput], subtitle_style: dict) -> Rend
                 )
             )
         if index > 0:
-            # Whoosh dipusatkan tepat di titik potong (durasi whoosh 0,45 dtk,
-            # jadi mulai 0,22 dtk sebelumnya) agar puncaknya jatuh di batas
-            # scene, bukan sebelumnya.
+            # Whoosh dipusatkan tepat di titik potong (mulai setengah durasi
+            # berkas sebelumnya) agar puncaknya jatuh di batas scene.
+            half = sfx_catalog.SFX_CATALOG[sfx_catalog.TRANSITION_SFX][
+                "duration_s"
+            ] / 2
             plan.sfx_events.append(
                 SfxEvent(
-                    at_s=round(max(start_s - 0.22, 0.0), 3),
+                    at_s=round(max(start_s - half, 0.0), 3),
                     sfx_id=sfx_catalog.TRANSITION_SFX,
                     gain=sfx_catalog.TRANSITION_GAIN,
                     kind="transition",
