@@ -4,20 +4,16 @@ from pathlib import Path
 SFX_DIR = Path(__file__).resolve().parent.parent / "assets" / "sfx"
 
 # id -> (nama tampil Bahasa Indonesia, gain bawaan 0..1, durasi detik)
+# SFX EVENT (ding/boom/pop/cash/fall/drum/scratch/sparkle) DIHAPUS pada
+# 2026-10-23 atas perintah pemilik — berkas WAV-nya dibuang dan entri
+# katalognya dicabut; pemilik akan mengirim berkas event baru, daftarkan
+# kembali di sini saat berkasnya tiba. Yang tersisa hanya whoosh transisi.
 SFX_CATALOG: dict[str, dict] = {
-    "ding": {"name": "Denting", "gain": 0.5, "duration_s": 0.5},
-    "boom": {"name": "Dentuman", "gain": 0.7, "duration_s": 0.8},
     # whoosh.wav = berkas kiriman pemilik (2026-10-23), sudah dipangkas dari
     # mp3 0,98 dtk (isi suara efektif ~0,23 dtk) menjadi WAV 0,28 dtk.
     # Jangan timpa lewat scripts/build_sfx_library.py — resep sintesisnya
     # hanya cadangan.
     "whoosh": {"name": "Desis transisi", "gain": 0.35, "duration_s": 0.28},
-    "pop": {"name": "Letupan", "gain": 0.5, "duration_s": 0.12},
-    "cash": {"name": "Denting koin", "gain": 0.55, "duration_s": 0.35},
-    "fall": {"name": "Meluncur turun", "gain": 0.55, "duration_s": 0.6},
-    "drum": {"name": "Sting drum", "gain": 0.5, "duration_s": 0.3},
-    "scratch": {"name": "Gesek piringan", "gain": 0.45, "duration_s": 0.4},
-    "sparkle": {"name": "Kilau naik", "gain": 0.45, "duration_s": 0.5},
 }
 
 TRANSITION_SFX = "whoosh"

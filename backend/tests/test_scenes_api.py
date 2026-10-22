@@ -169,12 +169,12 @@ def test_create_scene_clamps_sfx_gain(seeded):
         json={
             "voiceover": "Harga saham anjlok parah hari ini",
             "visual_prompt": "Inserted visual",
-            "sfx_cues": [{"sfx": "fall", "word": "anjlok", "gain": 3.0}],
+            "sfx_cues": [{"sfx": "whoosh", "word": "anjlok", "gain": 3.0}],
         },
     )
     assert created.status_code == 201
     assert created.json()["sfx_cues"] == [
-        {"sfx": "fall", "word": "anjlok", "gain": 1.0}
+        {"sfx": "whoosh", "word": "anjlok", "gain": 1.0}
     ]
 
 
@@ -182,7 +182,7 @@ def test_patch_scene_bad_gain_is_422_not_500(seeded):
     client = seeded["client"]
     response = client.patch(
         f"/api/scenes/{seeded['scene_ids'][0]}",
-        json={"sfx_cues": [{"sfx": "ding", "word": "Narasi", "gain": "keras"}]},
+        json={"sfx_cues": [{"sfx": "whoosh", "word": "Narasi", "gain": "keras"}]},
     )
     assert response.status_code == 422
     assert response.json()["error"]["kind"] == "InvalidSfx"
@@ -194,10 +194,10 @@ def test_patch_scene_cues_validated_against_new_voiceover(seeded):
         f"/api/scenes/{seeded['scene_ids'][0]}",
         json={
             "voiceover": "Harga saham anjlok parah hari ini",
-            "sfx_cues": [{"sfx": "fall", "word": "anjlok"}],
+            "sfx_cues": [{"sfx": "whoosh", "word": "anjlok"}],
         },
     )
     assert response.status_code == 200
     assert response.json()["scene"]["sfx_cues"] == [
-        {"sfx": "fall", "word": "anjlok"}
+        {"sfx": "whoosh", "word": "anjlok"}
     ]

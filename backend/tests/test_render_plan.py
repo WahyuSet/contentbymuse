@@ -133,13 +133,13 @@ def test_plan_sfx_events_from_cues_and_transitions():
 
     plan = build_render_plan(
         scenes=[
-            scene(1, "Indeks pasar anjlok tajam", [{"sfx": "fall", "word": "anjlok"}]),
-            scene(2, "Semua orang terdiam sekarang", [{"sfx": "ding", "word": "hantu"}]),
+            scene(1, "Indeks pasar anjlok tajam", [{"sfx": "whoosh", "word": "anjlok"}]),
+            scene(2, "Semua orang terdiam sekarang", [{"sfx": "whoosh", "word": "hantu"}]),
         ],
         subtitle_style=STYLE,
     )
     kinds = [(e.kind, e.sfx_id) for e in plan.sfx_events]
-    assert ("cue", "fall") in kinds
+    assert ("cue", "whoosh") in kinds
     assert ("transition", "whoosh") in kinds
     transisi = next(e for e in plan.sfx_events if e.kind == "transition")
     # Whoosh transisi harus menonjol (gain tinggi) dan terpusat di titik potong.
@@ -148,7 +148,7 @@ def test_plan_sfx_events_from_cues_and_transitions():
     half = sfx_catalog.SFX_CATALOG["whoosh"]["duration_s"] / 2
     assert transisi.gain == 0.85
     assert abs(transisi.at_s - (plan.scenes[1].start_s - half)) < 0.01
-    ding = next(e for e in plan.sfx_events if e.sfx_id == "ding")
-    assert ding.at_s >= plan.scenes[1].start_s - 0.01  # kata tak ketemu -> awal scene
-    fall = next(e for e in plan.sfx_events if e.sfx_id == "fall")
-    assert 0.7 < fall.at_s < 0.9  # kata ke-3 pada 0.4 dtk/kata
+    cues = [e for e in plan.sfx_events if e.kind == "cue"]
+    assert len(cues) == 2
+    assert cues[1].at_s >= plan.scenes[1].start_s - 0.01  # kata tak ketemu -> awal scene
+    assert 0.7 < cues[0].at_s < 0.9  # kata ke-3 pada 0.4 dtk/kata
