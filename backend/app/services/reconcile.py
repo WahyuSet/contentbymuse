@@ -278,8 +278,12 @@ async def _reconcile_publish(session, project) -> None:
         job, _created = await enqueue_once(
             session, type="publish", input=job_input, project_id=project.id
         )
-        if job.status not in ("failed", "cancelled"):
-            continue
+        if job.status in ("queued", "processing"):
+            continue  # penyiapan untuk rekor ini memang sedang berjalan
+        # Job sebelumnya sudah terminal sementara rekor (kembali) queued —
+        # mis. sesudah retry manual atas rekor yang gagal di tahap upload:
+        # antrekan penyiapan segar. enqueue_once mengembalikan job lama apa
+        # pun statusnya, jadi tanpa cabang ini retry tak pernah jalan.
         attempts = (
             await session.execute(
                 select(func.count(GenerationJob.id)).where(

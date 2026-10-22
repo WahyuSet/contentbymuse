@@ -462,3 +462,45 @@ def test_reap_stale_endpoint(tmp_path):
     assert asyncio.run(_check()) == ("awaiting_upload", "uploading")
     # Kosong berikutnya: tidak ada yang dilepas lagi.
     assert client.post("/api/publish/reap-stale").json() == {"reaped": 0}
+
+
+@pytest.mark.asyncio
+async def test_reconcile_reprepares_after_upload_failure_retry(factory):
+    """Regresi: retry atas rekor yang gagal di tahap UPLOAD (job penyiapan
+    pertamanya completed) harus mengantrekan job penyiapan segar — dedup
+    enqueue_once dulu mengembalikan job completed itu dan retry macet."""
+    from app.services.reconcile import reconcile
+
+    pid = await _arrange_reconcile(factory)
+    async with factory() as session:
+        record = (
+            await session.execute(
+                select(PublishRecord).where(PublishRecord.platform == "facebook")
+            )
+        ).scalar_one()
+        jobs = (
+            await session.execute(
+                select(GenerationJob).where(GenerationJob.type == "publish")
+            )
+        ).scalars().all()
+        job = next(
+            j for j in jobs if (j.input or {}).get("publish_id") == record.id
+        )
+        job.status = "completed"  # penyiapan pertama berhasil…
+        record.status = "failed"  # …tapi upload oleh eksekutor gagal
+        await session.commit()
+        record.status = "queued"  # retry_publish membalik ke queued
+        await session.commit()
+        record_id = record.id
+    await reconcile(pid, factory)
+    async with factory() as session:
+        jobs = (
+            await session.execute(
+                select(GenerationJob).where(GenerationJob.type == "publish")
+            )
+        ).scalars().all()
+        mine = [
+            j for j in jobs if (j.input or {}).get("publish_id") == record_id
+        ]
+        assert len(mine) == 2
+        assert sum(1 for j in mine if j.status == "queued") == 1
