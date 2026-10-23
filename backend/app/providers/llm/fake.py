@@ -82,17 +82,33 @@ def _ideas_fixture(messages) -> dict:
 
 
 _SCRIPT_VOICEOVERS = [
-    ("hook", "Rahasia besar di balik {c3}", "character", True),
-    ("setup", "Banyak orang melihatnya tetapi jarang ada yang memperhatikan", "closeup", True),
-    ("main", "Padahal ada penjelasan sederhana di balik kejadian ini", "character", True),
-    ("main", "Penjelasan itu berkaitan dengan kebiasaan dan lingkungan sekitarnya", "environment", False),
-    ("main", "Saat kondisi berubah tubuh langsung menyesuaikan diri perlahan", "process", True),
-    ("main", "Penyesuaian ini membantu bertahan dari gangguan di sekitarnya", "diagram", True),
-    ("main", "Tidak semua kejadian menunjukkan proses yang sama persis", "character", False),
-    ("main", "Ada kalanya prosesnya gagal dan hasilnya berbeda jauh", "closeup", True),
-    ("payoff", "Jadi kejadian tadi bukan kebetulan tanpa sebab apa pun", "character", True),
-    ("cta", "Pernah mengalami hal serupa di rumah atau sekitarmu", "environment", True),
+    # (beat, voiceover, visual_type, mascot, keyword_text); hook diisi dinamis.
+    ("hook", None, "character", True, None),
+    ("setup", "Banyak orang melihatnya tetapi jarang ada yang memperhatikan", "closeup", True, "SERING LEWAT"),
+    ("main", "Padahal ada penjelasan sederhana di balik kejadian ini", "character", True, "PENJELASAN"),
+    ("main", "Penjelasan itu berkaitan dengan kebiasaan dan lingkungan sekitarnya", "environment", False, "KEBIASAAN"),
+    ("main", "Saat kondisi berubah tubuh langsung menyesuaikan diri perlahan", "process", True, "MENYESUAIKAN DIRI"),
+    ("main", "Penyesuaian ini membantu bertahan dari gangguan di sekitarnya", "diagram", True, "BERTAHAN"),
+    ("main", "Tidak semua kejadian menunjukkan proses yang sama persis", "character", False, "TIDAK SELALU"),
+    ("main", "Ada kalanya prosesnya gagal dan hasilnya berbeda jauh", "closeup", True, "BISA GAGAL"),
+    ("payoff", "Jadi kejadian tadi bukan kebetulan tanpa sebab apa pun", "character", True, "BUKAN KEBETULAN"),
+    ("cta", "Pernah mengalami hal serupa di rumah atau sekitarmu", "environment", True, None),
 ]
+
+# Baris pengganti (indeks 6 dan 7) untuk fixture kategori politik: tepat 2
+# beat impact sesudah main dan sebelum cta — pertama ke dapur/dompet,
+# kedua ke tabungan/masa depan (Fase 9).
+_SCRIPT_POLITICS_IMPACTS = {
+    6: ("impact", "Akibatnya harga kebutuhan di dapur ikut naik perlahan", "environment", False, "HARGA NAIK"),
+    7: ("impact", "Tabungan warga ikut tergerus dan masa depan makin berat", "diagram", True, "TABUNGAN"),
+}
+
+
+def _wants_politics(messages: list[Message]) -> bool:
+    """Fixture politik bila prompt menyebut kategori politik, atau draf/issues
+    yang diperbaiki sudah membawa beat impact / isu impact_chain."""
+    joined = "\n".join(m.content for m in messages).lower()
+    return "politik" in joined or "impact_chain" in joined or '"impact"' in joined
 
 
 def _script_fixture(messages: list[Message]) -> dict:
@@ -102,10 +118,20 @@ def _script_fixture(messages: list[Message]) -> dict:
             if line.startswith("Idea title:"):
                 title = line.removeprefix("Idea title:").strip() or title
     core = " ".join(_QUESTION_LEAD.sub("", title).rstrip(".").split()[:6]) or "topik ini"
-    c3 = " ".join(core.split()[:3]) or "hal ini"
+    politics = _wants_politics(messages)
+    rows = [
+        _SCRIPT_POLITICS_IMPACTS.get(i, row) if politics else row
+        for i, row in enumerate(_SCRIPT_VOICEOVERS)
+    ]
     scenes = []
-    for i, (beat, template, visual_type, mascot) in enumerate(_SCRIPT_VOICEOVERS, start=1):
-        voiceover = template.format(c3=c3)
+    for i, (beat, template, visual_type, mascot, keyword) in enumerate(rows, start=1):
+        if template is None:
+            # Hook = parafrasa dekat judul (satu kalimat induk, Fase 9):
+            # kata-kata inti judul itu sendiri, diawali huruf kapital.
+            voiceover = core[:1].upper() + core[1:]
+            keyword = core.split()[0].upper()[:18]
+        else:
+            voiceover = template
         scenes.append(
             {
                 "beat": beat,
@@ -120,6 +146,7 @@ def _script_fixture(messages: list[Message]) -> dict:
                 "visual_type": visual_type,
                 "transition": "cut",
                 "emphasis_words": [],
+                "keyword_text": keyword,
             }
         )
     return {
