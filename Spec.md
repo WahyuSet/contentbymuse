@@ -974,7 +974,7 @@ class RenderPlan(BaseModel):
 - `h264_nvenc` dengan `-preset p5 -cq 21`. NVENC dideteksi lebih dulu dengan menyandikan satu bingkai uji (hasil di-cache per path FFmpeg). Bila tidak tersedia atau gagal, otomatis pakai `libx264 -preset medium -crf 20`; encoder yang dipakai dicatat di `render.encoder` dan log job. Hasil kosong atau lebih pendek 0,5 detik dari rencana ditolak.
 - `-pix_fmt yuv420p -r 30`, AAC 192 kbps 48 kHz, `-movflags +faststart`.
 - Thumbnail: frame pada detik 0,5 dari scene 1, JPEG kualitas 90. Sejak Fase 6b frame ini hanya cadangan di zip ekspor (dan poster pemutar); gambar thumbnail buatan (4.14) menggantikannya bila ada.
-- Setelah render: verifikasi durasi dengan ffprobe. Di luar 30 sampai 40 detik dicatat sebagai peringatan, tidak menggagalkan render.
+- Setelah render: verifikasi durasi dengan ffprobe. Di luar rentang target proyek (target_min_s/target_max_s) dicatat sebagai peringatan, tidak menggagalkan render (Fase 11 T10).
 
 ---
 
