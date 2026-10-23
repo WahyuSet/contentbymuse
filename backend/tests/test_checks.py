@@ -263,3 +263,87 @@ def test_number_budget_three_distinct_with_repeats_passes():
     rows[3] = ("main", "Total kerugian dua belas triliun rupiah tercatat", "environment", True)
     rows[4] = ("main", "Harga naik tiga puluh satu ribu per kilo", "process", True)
     assert "number_budget" not in codes(run_checks(scenes(rows)))
+
+
+# --- Fase 10 T2: beat twist politik ---
+
+TWIST_OK = [
+    ("hook", "Klaim pejabat harga pangan turun warga lega", "character", True),
+    ("setup", "Pedagang pasar tersenyum mendengar kabar baik itu", "environment", True),
+    ("main", "Harga beras diumumkan lebih murah dari sebelumnya", "closeup", False),
+    ("main", "Banyak keluarga berharap belanja dapur makin ringan", "character", True),
+    ("twist", "Ternyata klaim itu keliru dan warga yang menanggung", "diagram", False),
+    ("impact", "Harga mi dan telur tetap mahal di pasar", "environment", True),
+    ("impact", "Uang belanja keluarga habis lebih cepat tiap pekan", "closeup", True),
+    ("payoff", "Janji murah ternyata hanya cerita di panggung", "character", False),
+    ("payoff", "Warga kecil kembali menahan lapar malam ini", "environment", True),
+    ("cta", "Menurutmu kebijakan ini menolong siapa sebenarnya kawan", "character", True),
+]
+
+
+def test_twist_structure_required_for_politics():
+    issues = [
+        i for i in run_checks(scenes(with_beats(POLITICS_OK_BEATS)), category_slug="politics")
+        if i.code == "twist_structure"
+    ]
+    assert len(issues) == 1
+    assert issues[0].severity == "error"
+    assert issues[0].scene_position is None
+
+
+def test_twist_structure_passes_with_placed_marked_twist():
+    found = codes(run_checks(scenes(TWIST_OK), category_slug="politics"))
+    assert "twist_structure" not in found
+    assert "impact_chain" not in found
+    assert "number_budget" not in found
+
+
+def test_twist_structure_two_twists_fail():
+    rows = list(TWIST_OK)
+    rows[8] = ("twist", TWIST_OK[8][1], TWIST_OK[8][2], TWIST_OK[8][3])
+    issues = [
+        i for i in run_checks(scenes(rows), category_slug="politics")
+        if i.code == "twist_structure"
+    ]
+    assert len(issues) == 1
+    assert issues[0].severity == "error"
+
+
+def test_twist_structure_twist_before_main_fails():
+    rows = list(TWIST_OK)
+    rows[1], rows[4] = rows[4], rows[1]
+    assert "twist_structure" in codes(run_checks(scenes(rows), category_slug="politics"))
+
+
+def test_twist_structure_twist_after_first_impact_fails():
+    rows = list(TWIST_OK)
+    rows[4], rows[5] = rows[5], rows[4]
+    assert "twist_structure" in codes(run_checks(scenes(rows), category_slug="politics"))
+
+
+def test_twist_structure_twist_without_marker_fails():
+    rows = list(TWIST_OK)
+    rows[4] = (
+        "twist",
+        "Klaim pejabat rupanya keliru dan warga yang menanggung",
+        TWIST_OK[4][2],
+        TWIST_OK[4][3],
+    )
+    assert "twist_structure" in codes(run_checks(scenes(rows), category_slug="politics"))
+
+
+def test_twist_structure_skipped_for_non_politics():
+    assert "twist_structure" not in codes(run_checks(scenes(), category_slug="animals"))
+    assert "twist_structure" not in codes(run_checks(scenes()))
+
+
+def test_twist_structure_other_markers_pass():
+    for voiceover in (
+        "Padahal klaim itu keliru dan warga yang menanggung",
+        "Faktanya klaim itu keliru dan warga yang menanggung",
+    ):
+        rows = list(TWIST_OK)
+        rows[4] = ("twist", voiceover, TWIST_OK[4][2], TWIST_OK[4][3])
+        assert "twist_structure" not in codes(
+            run_checks(scenes(rows), category_slug="politics")
+        )

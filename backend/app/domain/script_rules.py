@@ -357,6 +357,40 @@ def run_checks(
                 "Rantai dampak harus sampai ke dapur/dompet dan tabungan/masa depan warga.",
             ))
 
+    # Beat twist (Fase 10): hanya kategori politik. Wajib TEPAT 1 scene beat
+    # "twist" sesudah minimal satu scene "main" dan sebelum scene "impact"
+    # pertama (bila ada), dengan koreksi eksplisit berpenanda di voiceover
+    # scene twist — hook menjanjikan klaim populer, twist mengoreksinya.
+    if category_slug == "politics" and n:
+        twist_markers = (
+            "ternyata", "padahal", "sebetulnya", "faktanya",
+            "salah paham", "bukan buat", "justru", "bukan begitu",
+        )
+        beats = [_field(s, "beat", "") for s in scenes]
+        twist_idx = [i for i, b in enumerate(beats) if b == "twist"]
+        main_idx = [i for i, b in enumerate(beats) if b == "main"]
+        impact_idx = [i for i, b in enumerate(beats) if b == "impact"]
+        has_marker = bool(twist_idx) and any(
+            marker in voiceovers[twist_idx[0]].lower() for marker in twist_markers
+        )
+        placed = (
+            len(twist_idx) == 1
+            and bool(main_idx)
+            and twist_idx[0] > main_idx[0]
+            and (not impact_idx or twist_idx[0] < impact_idx[0])
+            and has_marker
+        )
+        if not placed:
+            detail = f"ditemukan {len(twist_idx)} scene twist"
+            if twist_idx and not has_marker:
+                detail += ", tanpa penanda koreksi di voiceover scene twist"
+            issues.append(CheckIssue(
+                "twist_structure", "error", None,
+                f"Kategori politik wajib punya tepat 1 scene beat twist sesudah scene main "
+                f"dan sebelum impact pertama, dengan koreksi eksplisit berpenanda "
+                f"(ternyata/padahal/faktanya/dst); {detail}.",
+            ))
+
     # Satu kalimat induk (Fase 9): judul dan hook scene 1 harus parafrasa dekat
     # (Jaccard token >= 0,5), pola yang sama dengan cek duplicate_voiceover.
     if title and n:
