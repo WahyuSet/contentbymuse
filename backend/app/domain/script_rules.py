@@ -180,8 +180,8 @@ def run_checks(
     scenes,
     *,
     wps: float = 2.3,
-    target_min_s: int = 30,
-    target_max_s: int = 40,
+    target_min_s: int = 0,
+    target_max_s: int = 45,
     format_slug: str | None = None,
     category_slug: str | None = None,
     title: str | None = None,
@@ -205,17 +205,21 @@ def run_checks(
             "scene_count", "error", None,
             f"Jumlah scene {n}, wajib 8 sampai 14 scene.",
         ))
-    if n and (total_est < target_min_s or total_est > target_max_s):
-        if total_est < target_min_s:
-            delta = round((target_min_s - total_est) * wps)
-            arah = f"perlu ditambah sekitar {delta} kata"
-        else:
-            delta = round((total_est - target_max_s) * wps)
-            arah = f"perlu dipangkas sekitar {delta} kata"
+    if n and total_est > target_max_s:
+        delta = round((total_est - target_max_s) * wps)
         issues.append(CheckIssue(
             "duration_range", "error", None,
             f"Estimasi durasi total {total_est:.0f} detik dari {total_words} kata, "
-            f"di luar target {target_min_s}-{target_max_s} detik; {arah}.",
+            f"melebihi batas {target_max_s} detik; perlu dipangkas sekitar {delta} kata.",
+        ))
+    elif n and target_min_s > 0 and total_est < target_min_s:
+        delta_s = target_min_s - total_est
+        delta = round(delta_s * wps)
+        issues.append(CheckIssue(
+            "duration_short", "warning", None,
+            f"Estimasi durasi total {total_est:.0f} detik dari {total_words} kata, "
+            f"kurang sekitar {delta_s:.0f} detik dari target minimal {target_min_s} detik; "
+            f"perlu ditambah sekitar {delta} kata.",
         ))
     if n and ests[0] > 3.5:
         max_hook_words = int((3.5 - 0.15) * wps)

@@ -44,12 +44,57 @@ def test_scene_count_error():
 
 
 def test_duration_range_error_mentions_word_delta():
-    rows = [("main", "Satu dua tiga empat lima", "character", True)] * 10
+    # 10 scene x 11 kata = 110 kata, estimasi ~49,3 detik > batas 45 detik.
+    rows = [
+        ("main", "Satu dua tiga empat lima enam tujuh delapan sembilan sepuluh sebelas", "character", True)
+    ] * 10
     rows[0] = ("hook", rows[0][1], "character", True)
     issues = run_checks(scenes(rows))
     issue = next(i for i in issues if i.code == "duration_range")
     assert issue.severity == "error"
     assert "kata" in issue.message
+    assert "45" in issue.message
+
+
+def _duration_rows(word_counts):
+    openers = [
+        "Mula", "Lalu", "Kini", "Nanti", "Sebab",
+        "Akhir", "Cerita", "Suara", "Cahaya", "Penutup",
+    ]
+    visual_types = ["character", "closeup", "environment", "process", "diagram"]
+    rows = []
+    for i, count in enumerate(word_counts):
+        beat = "hook" if i == 0 else "cta" if i == len(word_counts) - 1 else "main"
+        voiceover = " ".join([openers[i]] + ["kata"] * (count - 1))
+        rows.append((beat, voiceover, visual_types[i % len(visual_types)], i % 3 != 2))
+    return rows
+
+
+def test_duration_under_45_seconds_has_no_duration_range():
+    # Total 98 kata, hook 7 kata: estimasi 98/2,3 + 10*0,15 = ~44,1 detik.
+    rows = _duration_rows([7, 10, 10, 10, 10, 10, 10, 10, 10, 11])
+    issues = run_checks(scenes(rows))
+    assert "duration_range" not in codes(issues)
+
+
+def test_duration_short_script_has_no_duration_issue_with_default_min_zero():
+    # Total 50 kata: estimasi 50/2,3 + 10*0,15 = ~23,2 detik; min bawaan 0.
+    rows = _duration_rows([5] * 10)
+    issues = run_checks(scenes(rows))
+    assert "duration_range" not in codes(issues)
+    assert "duration_short" not in codes(issues)
+
+
+def test_duration_short_is_warning_when_target_min_explicit():
+    # Estimasi sama ~23,2 detik, tetapi target_min_s=30 eksplisit.
+    rows = _duration_rows([5] * 10)
+    issues = run_checks(scenes(rows), target_min_s=30)
+    short = [i for i in issues if i.code == "duration_short"]
+    assert len(short) == 1
+    assert short[0].severity == "warning"
+    assert "kata" in short[0].message
+    assert "duration_range" not in codes(issues)
+    assert all(i.severity != "error" for i in short)
 
 
 def test_hook_length_error():

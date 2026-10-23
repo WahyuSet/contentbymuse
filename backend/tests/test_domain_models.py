@@ -15,7 +15,7 @@ async def test_project_defaults(session):
     session.add(project)
     await session.commit()
     assert project.language == "id-ID"
-    assert (project.target_min_s, project.target_max_s) == (30, 40)
+    assert (project.target_min_s, project.target_max_s) == (0, 45)
     assert project.settings == {}
 
 
