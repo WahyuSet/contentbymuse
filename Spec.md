@@ -125,7 +125,7 @@ ID memakai ULID (string 26 karakter, terurut waktu). Semua waktu dalam UTC. Kolo
 | `category_source` | enum `user` / `suggested` / null | |
 | `format_id` | fk null | null berarti Bebas |
 | `language` | str | default `id-ID` |
-| `target_min_s`, `target_max_s` | int | default 30, 40 |
+| `target_min_s`, `target_max_s` | int | default 0, 45 (Fase 11: durasi bukan target — video cukup di bawah 45 detik) |
 | `selected_idea_id` | fk null | |
 | `active_script_id` | fk null | |
 | `visual_style_id` | fk | |
@@ -432,7 +432,8 @@ Fungsi murni `run_checks(scenes, wps, rules) -> list[CheckIssue]`. Setiap issue 
 | Kode | Aturan default | Severity |
 |---|---|---|
 | `scene_count` | 8 ≤ n ≤ 14 | error |
-| `duration_range` | total estimasi di antara `target_min_s` dan `target_max_s` | error |
+| `duration_range` | total estimasi melebihi `target_max_s` (Fase 11: satu-satunya pagar durasi; estimasi di bawahnya selalu lolos) | error |
+| `duration_short` | total estimasi di bawah `target_min_s`, hanya bila `target_min_s` > 0 (Fase 11) | warning |
 | `hook_length` | estimasi scene 1 ≤ 3,5 detik | error |
 | `scene_too_long` | voiceover > 12 kata atau estimasi > 5 detik (batas keras 16 kata ada di schema) | warning |
 | `scene_too_short` | voiceover < 3 kata | warning |
@@ -955,7 +956,7 @@ class RenderPlan(BaseModel):
 - Gaya default (disimpan di `app_setting.subtitle_style`):
   - font Plus Jakarta Sans ExtraBold (OFL, dibundel di `app/assets/fonts/`), ukuran 78 px
   - putih dengan outline hitam 6 px, tanpa kotak latar
-  - rata tengah, garis dasar di y = 1340 (di atas area 25% bawah yang tertutup tombol aplikasi)
+  - rata tengah, margin bawah 400 px (garis dasar y = 1520; Fase 11 menurunkannya dari 580 px / y = 1340 atas masukan pemilik — tetap di atas area tombol aplikasi)
   - kata di `emphasis_words` diberi warna sorot `#FFD84D` dan skala 110% lewat tag ASS `\c` dan `\fscx` / `\fscy`
 - Dibakar dengan filter `ass` (libass) dan diekspor juga sebagai `.srt`.
 - Watermark (Fase 6g): logo (dipotong persegi dari tengah lalu jadi lingkaran 72 px, `v` 2) dan teks (Plus Jakarta Sans ExtraBold 34 px, putih dengan outline hitam 3 px) digabung Pillow menjadi satu PNG transparan di folder kerja (`media/watermark.compose_watermark`), opacity dipasang di alpha. Setelah filter `ass`, PNG itu ditempel di kiri atas dengan margin 48 px (`overlay=48:48`), sebagai input terakhir setelah SFX. Tanpa watermark, graph sama persis dengan sebelumnya. Thumbnail buatan provider tidak diberi watermark; frame render (cadangan zip dan poster) diambil dari video, jadi ikut membawanya. Logo yang filenya hilang menggagalkan render dengan pesan yang menyebut halaman Sistem.

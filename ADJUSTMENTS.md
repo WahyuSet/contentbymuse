@@ -66,6 +66,19 @@ TTS → video per scene → render gabung 30–40 dtk → 1 gambar thumbnail.
    penting: video adalah sumber daya paling langka/lambat, jadi tidak ada
    generate video sebelum script disetujui. Metadata 3 platform tetap
    sesudah render, seperti spec.
+9. **Fase 11 — kualitas narasi & suara (2026-10-23, masukan pemilik atas test
+   data center)** — (a) subtitle `margin_v` bawaan 580 → 400 (Spec §8.5 sudah
+   diperbarui); (b) durasi bukan lagi target: bawaan `target_min_s/target_max_s`
+   = 0/45, `duration_range` hanya error bila estimasi > maks, `duration_short`
+   warning bila proyek memasang min > 0 (Spec §4.4 sudah diperbarui);
+   (c) anti-kaku: aturan kalimat utuh + jangkar bahasa di prompt
+   (`spoken_indonesian`, `pacing`), check warning `fragment_style`,
+   `validate.script` v4 menilai keluwesan tuturan; (d) QC bahasa per klip
+   suara (`app/services/lang_qc.py`): deteksi faster-whisper reuse model
+   aligner, lolos = id ≥ 0,60, regenerasi maks 2×, hasil di `asset.data`
+   (`lang_qc`) + warning job; aktif hanya bila `WHISPER_MODEL` terpasang.
+   Catatan jujur: Whisper sulit membedakan id vs ms — QC menangkap drift
+   kasar; penilai akhir tetap telinga pemilik.
 
 ## Spike Fase 0 yang harus jalan sebelum angka dikunci
 
