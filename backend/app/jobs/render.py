@@ -183,7 +183,13 @@ async def run_render_job(
 
     flush_task = asyncio.create_task(_flush_progress())
     try:
-        result = await run_render(plan, workdir=workdir, progress_cb=_on_progress)
+        result = await run_render(
+            plan,
+            workdir=workdir,
+            progress_cb=_on_progress,
+            target_min_s=project.target_min_s,
+            target_max_s=project.target_max_s,
+        )
         asset_id = await _save_result(
             factory, storage, project, result, digest, workdir
         )

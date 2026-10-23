@@ -53,6 +53,34 @@ def detect_encoder(ffmpeg: str = "ffmpeg") -> tuple[str, list[str]]:
     return detected
 
 
+def duration_warning(
+    duration_s: float, target_min_s: int, target_max_s: int
+) -> str | None:
+    """Warning durasi hasil render terhadap rentang target PROYEK (Fase 11 T10).
+
+    Semantik sama dengan run_checks naskah: pagar atas selalu berlaku; pagar
+    bawah hanya bila proyek memasang target_min_s > 0. Dulu hardcoded 30-40
+    sehingga video valid 20-29 dtk (sah di bawah aturan <45 dtk) kena warning
+    palsu, dan proyek warisan dinilai terhadap rentang yang bukan miliknya.
+    """
+    if duration_s > target_max_s:
+        if target_min_s > 0:
+            return (
+                f"Durasi video {duration_s:.1f} detik di luar rentang target "
+                f"proyek {target_min_s}-{target_max_s} detik."
+            )
+        return (
+            f"Durasi video {duration_s:.1f} detik di luar rentang target "
+            f"proyek (maksimal {target_max_s} detik)."
+        )
+    if target_min_s > 0 and duration_s < target_min_s:
+        return (
+            f"Durasi video {duration_s:.1f} detik di luar rentang target "
+            f"proyek {target_min_s}-{target_max_s} detik."
+        )
+    return None
+
+
 @dataclass
 class RenderResult:
     video_path: Path
@@ -71,6 +99,8 @@ async def run_render(
     workdir: Path,
     ffmpeg: str = "ffmpeg",
     progress_cb=None,
+    target_min_s: int = 0,
+    target_max_s: int = 45,
 ) -> RenderResult:
     workdir.mkdir(parents=True, exist_ok=True)
     ass_path = workdir / "subtitles.ass"
@@ -154,10 +184,9 @@ async def run_render(
     if thumb_rc != 0 or not thumb_path.exists():
         raise RenderError("Gagal mengambil bingkai thumbnail dari video.")
     warnings: list[str] = []
-    if duration < 30 or duration > 40:
-        warnings.append(
-            f"Durasi video {duration:.1f} detik di luar rentang target 30-40 detik."
-        )
+    warning = duration_warning(duration, target_min_s, target_max_s)
+    if warning is not None:
+        warnings.append(warning)
     return RenderResult(
         video_path=video_path,
         srt_path=srt_path,
