@@ -83,7 +83,10 @@ async def test_validate_script_active_is_v3_with_twist_and_binary_areas(session)
     await session.commit()
     service = PromptService(session)
     version = await service._active_version("validate.script")
-    assert version.version == 3
+    # Fase 11 menaikkan validate.script ke v4 (superset v3: area twist +
+    # CTA biner Fase 10 tetap ada, ditambah kriteria keluwesan tuturan) —
+    # versi aktif kini 4.
+    assert version.version == 4
     body = await service.active_body("validate.script")
     # (e) Twist quality, (f) Binary CTA
     assert "twist" in body.lower()

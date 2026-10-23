@@ -55,9 +55,10 @@ async def test_validate_script_active_is_v2_with_four_benchmark_areas(session):
     await session.commit()
     service = PromptService(session)
     version = await service._active_version("validate.script")
-    # Fase 10 menaikkan validate.script ke v3 (superset v2: 4 area benchmark
-    # Fase 9 tetap ada, ditambah twist + CTA biner) — versi aktif kini 3.
-    assert version.version == 3
+    # Fase 10 menaikkan validate.script ke v3, Fase 11 ke v4 (superset:
+    # 4 area benchmark Fase 9 tetap ada, ditambah twist + CTA biner dan
+    # kriteria keluwesan tuturan) — versi aktif kini 4.
+    assert version.version == 4
     body = await service.active_body("validate.script")
     # (a) keyword coverage, (b) budget angka, (c) rantai impact, (d) judul-hook
     assert "keyword" in body.lower()
