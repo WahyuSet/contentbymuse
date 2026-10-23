@@ -147,6 +147,7 @@ async def test_calibrated_wps_changes_checks(tmp_path):
     factory, project_id, script_id, _scenes, provider_id = await _seed(tmp_path)
     async with factory() as session:
         project = await session.get(Project, project_id)
+        project.target_min_s = 30
         script = await session.get(Script, script_id)
         clean = await checks_for(session, project, script)
         assert all(i.code != "duration_range" for i in clean)
@@ -158,5 +159,9 @@ async def test_calibrated_wps_changes_checks(tmp_path):
         )
         await session.commit()
         sped = await checks_for(session, project, script)
-        # 21 kata total pada 4,5 kata/dtk jauh di bawah target 30 dtk.
-        assert any(i.code == "duration_range" for i in sped)
+        # Pada 4,5 kata/dtk estimasi jauh di bawah target min 30 dtk:
+        # semantik baru = warning duration_short, bukan error duration_range.
+        assert any(
+            i.code == "duration_short" and i.severity == "warning" for i in sped
+        )
+        assert all(i.code != "duration_range" for i in sped)
