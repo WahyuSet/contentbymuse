@@ -95,20 +95,34 @@ _SCRIPT_VOICEOVERS = [
     ("cta", "Pernah mengalami hal serupa di rumah atau sekitarmu", "environment", True, None),
 ]
 
-# Baris pengganti (indeks 6 dan 7) untuk fixture kategori politik: tepat 2
-# beat impact sesudah main dan sebelum cta — pertama ke dapur/dompet,
-# kedua ke tabungan/masa depan (Fase 9).
-_SCRIPT_POLITICS_IMPACTS = {
+# Baris pengganti untuk fixture kategori politik (Fase 9+10): indeks 5 =
+# beat twist (koreksi eksplisit berpenanda + kalimat adil, tanpa angka),
+# indeks 6 dan 7 = tepat 2 beat impact sesudah main dan sebelum cta —
+# pertama ke dapur/dompet, kedua ke tabungan/masa depan; indeks 9 =
+# penutup berupa pertanyaan CTA biner.
+_SCRIPT_POLITICS_OVERRIDES = {
+    5: ("twist", "Ternyata klaim tadi keliru, biar adil catat juga sisi baiknya", "diagram", True, "TERNYATA KELIRU"),
     6: ("impact", "Akibatnya harga kebutuhan di dapur ikut naik perlahan", "environment", False, "HARGA NAIK"),
     7: ("impact", "Tabungan warga ikut tergerus dan masa depan makin berat", "diagram", True, "TABUNGAN"),
+    9: ("cta", "Kebijakan ini menolong warga atau malah memberatkan warga?", "environment", True, None),
 }
 
 
 def _wants_politics(messages: list[Message]) -> bool:
     """Fixture politik bila prompt menyebut kategori politik, atau draf/issues
-    yang diperbaiki sudah membawa beat impact / isu impact_chain."""
+    yang diperbaiki sudah membawa beat impact / isu impact_chain (Fase 9),
+    beat twist / isu twist_structure / isu binary_cta (Fase 10). Kata
+    "twist" polos BUKAN pemicu: blok aturan twist muncul di prompt semua
+    kategori, jadi hanya bentuk berkode/berkuotasi yang memicu."""
     joined = "\n".join(m.content for m in messages).lower()
-    return "politik" in joined or "impact_chain" in joined or '"impact"' in joined
+    return (
+        "politik" in joined
+        or "impact_chain" in joined
+        or '"impact"' in joined
+        or "twist_structure" in joined
+        or "binary_cta" in joined
+        or '"twist"' in joined
+    )
 
 
 def _script_fixture(messages: list[Message]) -> dict:
@@ -120,7 +134,7 @@ def _script_fixture(messages: list[Message]) -> dict:
     core = " ".join(_QUESTION_LEAD.sub("", title).rstrip(".").split()[:6]) or "topik ini"
     politics = _wants_politics(messages)
     rows = [
-        _SCRIPT_POLITICS_IMPACTS.get(i, row) if politics else row
+        _SCRIPT_POLITICS_OVERRIDES.get(i, row) if politics else row
         for i, row in enumerate(_SCRIPT_VOICEOVERS)
     ]
     scenes = []
@@ -161,14 +175,55 @@ def _script_fixture(messages: list[Message]) -> dict:
     }
 
 
+_BINARY_FALLBACK_QUESTION = "Kebijakan ini membantu warga atau malah memberatkan warga?"
+
+
+def _binary_question(messages) -> str | None:
+    """Pertanyaan biner penutup naskah dari prompt metadata (Fase 10):
+    kalimat terakhir yang memuat " atau " dan "?", dengan kedua sisi
+    "atau" masing-masing >= 2 kata dan tidak identik (pola cek
+    binary_cta). Scene penutup ada di prompt sebagai script_text, jadi
+    kandidat terakhir yang sah adalah pertanyaan penutupnya."""
+    joined = "\n".join(m.content for m in messages)
+    found = None
+    for match in re.finditer(r"[^.!?\n]*\?", joined):
+        sentence = match.group(0).strip().strip("\"'").strip()
+        label, sep, rest = sentence.partition(": ")
+        if sep and len(label.split()) <= 3:
+            sentence = rest.strip()
+        if not sentence.endswith("?"):
+            continue
+        atau = list(re.finditer(r"\batau\b", sentence, flags=re.IGNORECASE))
+        if not atau:
+            continue
+        split = atau[-1]
+
+        def _side(text: str) -> list[str]:
+            return [
+                t
+                for t in (
+                    token.strip(".,!?;:\"'()").lower()
+                    for token in text.split()
+                )
+                if t
+            ]
+
+        left = _side(sentence[: split.start()])
+        right = _side(sentence[split.end() :])
+        if len(left) >= 2 and len(right) >= 2 and left != right:
+            found = sentence
+    return found
+
+
 def _metadata_fixture(messages) -> dict:
     core = _topic_core(messages)
     cap = core[:1].upper() + core[1:]
+    question = _binary_question(messages) or _BINARY_FALLBACK_QUESTION
     return {
         "title": f"{cap} — Penonton Wajib Tahu!",
         "description": (
             f"Video ini membahas {core} dengan bahasa sederhana. "
-            "Menurut kamu, bagian mana yang paling mengejutkan? Tulis di komentar!"
+            f"{question} Tulis di komentar!"
         ),
         "hashtags": ["tikusberdasi", "shorts", "berita"],
         "fb_caption": f"{cap}! Simak sampai habis. #tikusberdasi #shorts",
