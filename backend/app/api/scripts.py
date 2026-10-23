@@ -384,7 +384,7 @@ async def get_pipeline(project_id: str, session: SessionDep):
     return PipelineOut(project_id=project_id, stages=[script_stage, validation_stage])
 
 
-BEATS = {"hook", "setup", "main", "impact", "payoff", "cta", "loop"}
+BEATS = {"hook", "setup", "main", "twist", "impact", "payoff", "cta", "loop"}
 VISUAL_TYPES = {"character", "object", "process", "environment", "diagram", "closeup"}
 TRANSITIONS = {"cut", "crossfade", "punch_in"}
 

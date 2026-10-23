@@ -36,8 +36,8 @@ class SfxCue(BaseModel):
 
 class SceneDraft(BaseModel):
     beat: str = Field(
-        pattern="^(hook|setup|main|impact|payoff|cta|loop)$",
-        description="Peran scene dalam alur: hook, setup, main, impact, payoff, cta, loop",
+        pattern="^(hook|setup|main|twist|impact|payoff|cta|loop)$",
+        description="Peran scene dalam alur: hook, setup, main, twist, impact, payoff, cta, loop",
     )
     voiceover: str = Field(description="Narasi lisan Bahasa Indonesia, 3 sampai 16 kata")
     subtitle: str | None = Field(default=None, description="Teks subtitle bila berbeda dari voiceover")
