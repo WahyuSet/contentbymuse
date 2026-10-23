@@ -1,1 +1,1 @@
-Safe zone: compose for a vertical 9:16 frame with the main subject in the upper-middle area. Keep the bottom quarter of the frame and the right edge free of important details, because subtitles and app buttons cover those areas.
+Safe zone: compose for a vertical 9:16 frame with the main subject in the upper-middle area. Keep the bottom quarter of the frame and the right edge free of important details, because subtitles and app buttons cover those areas. Keep the top 22% of the frame free of important details: the factory composites the scene's keyword text there.
