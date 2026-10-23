@@ -66,6 +66,9 @@ async def test_fake_script_fixture_politics_has_impact_chain():
     )
     errors = [i for i in issues if i.severity == "error"]
     assert errors == []
+    # Fase 11 T5: fixture politik adalah kalimat utuh bergaya lisan —
+    # tidak boleh ada warning fragment_style sama sekali.
+    assert [i for i in issues if i.code == "fragment_style"] == []
 
 
 async def test_fake_validation_fixture_passes():
@@ -114,6 +117,9 @@ async def test_fake_script_fixture_politics_twist_and_binary_cta():
     errors = [i for i in issues if i.severity == "error"]
     assert errors == []
     assert [i for i in issues if i.code == "fairness_marker"] == []
+    # Fase 11 T5: fixture politik adalah kalimat utuh bergaya lisan —
+    # tidak boleh ada warning fragment_style sama sekali.
+    assert [i for i in issues if i.code == "fragment_style"] == []
 
 
 async def test_fake_script_fixture_non_politics_unchanged():
