@@ -54,6 +54,22 @@ class CheckIssue:
 
 
 _WRITTEN_WORDS = {"adalah", "bahwa", "merupakan", "tersebut", "tak", "yaitu", "dimana"}
+# Kata kerja tak berimbuhan + kata penghubung untuk check fragment_style
+# (Fase 11, ruling R1 di ledger fase).
+_FRAGMENT_BARE_VERBS = {
+    "ada", "dapat", "masuk", "naik", "turun", "jadi", "bikin", "pakai",
+    "bisa", "ikut", "catat", "lihat", "dengar", "rasa", "tahu", "buat",
+    "beri", "ambil", "taruh", "simpan", "buka", "tutup", "jalan", "lari",
+    "makan", "minum", "tidur", "bangun", "duduk", "kerja", "main", "pergi",
+    "pulang", "datang", "sampai", "mulai", "selesai", "bantu", "jaga",
+    "tahan", "lawan", "pilih", "dukung", "tolak", "terima", "kirim",
+}
+_FRAGMENT_VERB_PREFIXES = ("me", "di", "ber", "ter")
+_FRAGMENT_CONNECTORS = {
+    "dan", "tapi", "tetapi", "lalu", "kemudian", "karena", "sebab",
+    "sehingga", "yang", "saat", "ketika", "kalau", "agar", "supaya",
+    "biar", "atau", "juga", "akhirnya", "sementara", "padahal", "ternyata",
+}
 _TTS_SYMBOLS = ("%", "&", "/")
 _ROMAN_RE = re.compile(r"\b[IVXLCDM]{2,}\b")
 
@@ -326,6 +342,41 @@ def run_checks(
         issues.append(CheckIssue(
             "repeated_opener", "warning", position_of(index, scenes[index]),
             "Kata 'jadi' membuka lebih dari satu scene; pembuka terasa monoton."))
+
+    # Gaya fragmen (Fase 11): scene pendek tanpa kata kerja, atau rangkaian
+    # koma tanpa kata penghubung, cenderung terbaca sebagai fragmen judul
+    # berita yang kaku — bukan kalimat utuh seperti orang bercerita.
+    for index, scene in enumerate(scenes):
+        voiceover = voiceovers[index]
+        if not voiceover.strip():
+            continue
+        pos = position_of(index, scene)
+        tokens = [
+            t.strip(".,!?;:\"'()").lower()
+            for t in voiceover.split()
+            if t.strip(".,!?;:\"'()")
+        ]
+        has_verb = any(
+            (len(token) >= 5 and token.startswith(_FRAGMENT_VERB_PREFIXES))
+            or token in _FRAGMENT_BARE_VERBS
+            for token in tokens
+        )
+        reasons: list[str] = []
+        if word_counts[index] <= 6 and not has_verb:
+            reasons.append(
+                f"fragmen pendek tanpa kata kerja ({word_counts[index]} kata)"
+            )
+        if voiceover.count(",") >= 3 and not (
+            set(tokens) & _FRAGMENT_CONNECTORS
+        ):
+            reasons.append("rangkaian koma tanpa kata penghubung")
+        if reasons:
+            issues.append(CheckIssue(
+                "fragment_style", "warning", pos,
+                f"Scene {pos}: voiceover terasa seperti fragmen "
+                f"({'; '.join(reasons)}); tulis sebagai kalimat utuh "
+                "dengan subjek dan kata kerja, seperti orang bercerita.",
+            ))
 
     key_numbers: set = set()
     for voiceover in voiceovers:

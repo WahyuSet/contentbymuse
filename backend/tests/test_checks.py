@@ -546,3 +546,51 @@ def test_fairness_marker_skipped_for_non_politics_and_without_twist():
     assert "fairness_marker" not in codes(
         run_checks(scenes(rows), category_slug="politics")
     )
+
+
+# --- Fase 11 T4: fragment_style ---
+
+
+def _clean_with_middle_voiceover(voiceover):
+    rows = list(CLEAN)
+    rows[4] = ("main", voiceover, CLEAN[4][2], CLEAN[4][3])
+    return rows
+
+
+def test_fragment_style_short_fragment_without_verb_warns():
+    rows = _clean_with_middle_voiceover("PLN pelanggan raksasa malam ini")
+    issues = [
+        i for i in run_checks(scenes(rows)) if i.code == "fragment_style"
+    ]
+    assert len(issues) == 1
+    assert issues[0].severity == "warning"
+    assert issues[0].scene_position == 5
+
+
+def test_fragment_style_short_with_listed_verb_passes():
+    rows = _clean_with_middle_voiceover("Cicak langsung naik sekarang")
+    assert "fragment_style" not in codes(run_checks(scenes(rows)))
+
+
+def test_fragment_style_short_with_prefixed_verb_passes():
+    rows = _clean_with_middle_voiceover("Musuh mengejar cicak kecil itu")
+    assert "fragment_style" not in codes(run_checks(scenes(rows)))
+
+
+def test_fragment_style_comma_chain_without_connector_warns():
+    rows = _clean_with_middle_voiceover(
+        "Harga naik, warga menjerit, antrean panjang, semua terdampak"
+    )
+    issues = [
+        i for i in run_checks(scenes(rows)) if i.code == "fragment_style"
+    ]
+    assert len(issues) == 1
+    assert issues[0].severity == "warning"
+    assert issues[0].scene_position == 5
+
+
+def test_fragment_style_comma_chain_with_connector_passes():
+    rows = _clean_with_middle_voiceover(
+        "Harga naik, warga menjerit, dan antrean makin panjang, semua menunggu"
+    )
+    assert "fragment_style" not in codes(run_checks(scenes(rows)))
