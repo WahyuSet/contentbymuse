@@ -63,5 +63,39 @@ Fixture politik diperbarui: sisipkan scene twist berpenanda + kalimat adil, scen
 
 ### Frontend
 
-Dropdown beat di editor scene menambah opsi `twist` (label "Twist / Koreksi"). Bila ada pemetaan label/warna beat, samakan polanya denga
-...[truncated 3975 chars]
+Dropdown beat di editor scene menambah opsi `twist` (label "Twist / Koreksi"). Bila ada pemetaan label/warna beat, samakan polanya dengan beat lain yang sudah ada.
+
+### Cron produksi (diterapkan agen induk, bukan build)
+
+- `tikus-daily-production` Langkah 4 ditambah **Langkah 4C**: saat menimpa scene proyek politik — hook ditulis sebagai klaim populer; tepat 1 scene beat `twist` sesudah scene main terakhir dan sebelum impact pertama, narasinya mengandung penanda koreksi eksplisit dan satu kalimat adil; scene penutup adalah pertanyaan biner. Berlaku juga untuk produksi slot ekstra atas perintah pemilik.
+- Verifikasi 4B+ naik dari 4 lapis menjadi **5 lapis**: lapis kelima memeriksa pasangan klaim↔koreksi (hook menyatakan klaim populer, scene twist mengoreksinya) dan penutup (pertanyaan biner yang sama dengan pertanyaan di deskripsi metadata).
+- Laporan produksi wajib memuat **7 bukti** (sebelumnya 5): bertambah (6) kalimat twist verbatim dan (7) pertanyaan biner penutup verbatim.
+
+## Tugas (TDD, satu commit per tugas)
+
+1. **Beat `twist` di skema** — tambahkan ke `BEATS` (api/scripts.py) dan semua enumerasi beat lain (grep `"payoff"`/`BEATS` untuk menemukannya: skema scene, fixture, frontend disiapkan di Tugas 8); tes: PATCH scene dengan beat `twist` diterima, beat tak dikenal tetap ditolak. Tanpa migrasi (kolom beat string bebas — verifikasi dulu).
+2. **Cek `twist_structure`** — di `run_checks`, mengikuti pola `impact_chain`; tes positif/negatif: tanpa twist, twist ganda, twist sebelum main, twist sesudah impact, twist tanpa penanda koreksi, non-politik tidak terpengaruh.
+3. **Cek `binary_cta` + `fairness_marker`** — tes: penutup biner sah lolos; "Menurut lo gimana?" gagal (error di politik, warning di kategori lain); sisi `atau` terlalu pendek gagal; penanda adil hilang → warning `fairness_marker`.
+4. **Blok prompt baru + revisi** — `twist_rules.md`, `cta_rules.md`, revisi `hook_rules.md` dan `categories/politics.md`; tes konten prompt dirender memuat penanda kedua blok.
+5. **Prompt task v3 + metadata v2** — file versi baru untuk script.generate/fix/revise, validate.script (3 kriteria benchmark baru), metadata.generate (pertanyaan deskripsi = CTA biner penutup); tes versi aktif + konten kriteria. Bila ada tes lama yang mematok versi aktif validate.script == 2, sesuaikan assert versinya (supersesi disengaja, isi kriteria lama tetap di-assert).
+6. **FakeLLM selaras** — fixture politik memuat scene twist berpenanda + kalimat adil + penutup biner; deskripsi metadata memuat pertanyaan biner yang sama; tes rantai kering lolos semua cek (lama + baru) dan validasi PASS.
+7. **Teks cron Langkah 4C** — siapkan teks final siap terapkan (file di `.superpowers/sdd/fase-10-twist-cta/langkah-4c-final.md`); build TIDAK menyentuh cron, agen induk menerapkan setelah kode terbukti.
+8. **Frontend** — opsi beat "Twist / Koreksi" di editor scene; vitest + build hijau.
+9. **E2E pilot tanpa publish** — proyek politik topik baru terverifikasi dengan klaim populer yang bisa di-twist; pin voice_provider_id + voice_id Aria; rantai penuh sampai render; frame sheet untuk QC visual; transkrip verbatim (hook, twist, adil, CTA) dilaporkan ke pemilik untuk "tes baca". Kontrol negatif wajib: salinan scene tanpa twist → error `twist_structure`; salinan penutup generik → error `binary_cta` (output nyata disimpan). Keamanan publish: patuhi gerbang slot live (jangan restart saat ada record `uploading`) dan netralkan record publish proyek uji begitu muncul; keadaan akhir awaiting global harus bersih dari proyek uji.
+
+## Kriteria sukses
+
+- Semua cek baru terbukti menolak pelanggaran (kontrol negatif dengan output nyata), bukan hanya menerima yang benar.
+- Suite tidak regresi: backend ≥285 passed (baseline 264 + tes baru), ruff bersih, frontend vitest + build OK. Tanpa migrasi baru.
+- Pilot: validasi PASS, `run_checks` 0 error, render 30–40 dtk 1080×1920, keyword 10/10, angka kunci VO ≤3, metadata deskripsi memuat pertanyaan biner penutup.
+- Pemilik menjalankan "tes baca" atas transkrip pilot: hook terbaca sebagai klaim populer, twist terbaca sebagai koreksinya, penutup terbaca sebagai dua pilihan. Verdict pemilik = penutup fase.
+
+## Di luar cakupan
+
+- Eksperimen durasi 60–90 dtk (keputusan pemilik terpisah).
+- Hardening approve-time re-check untuk jalur timpa scene (utang teknis lama, perintah terpisah).
+- CTA biner di `fb_caption` (fase ini hanya deskripsi YouTube); pola FB dinilai setelah data produksi berjalan.
+
+---
+
+*Catatan perbaikan dokumen (2026-10-23 malam): file plan ini awalnya terpotong di tengah bagian Frontend saat penulisan pertama (ekor dokumen hilang, terdeteksi koordinator build dan dicatat di ledger `.superpowers/sdd/fase-10-twist-cta/progress.md`). Bagian dari "### Cron produksi" sampai akhir dokumen ini ditulis ulang persis sesuai desain yang dieksekusi build (Tugas 1–9 dan ruling koordinator R1–R7), agar repo menyimpan plan yang utuh.*
