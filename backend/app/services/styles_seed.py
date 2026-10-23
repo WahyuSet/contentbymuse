@@ -9,17 +9,26 @@ _STYLE_TEXT = (
     "Flat 2D hand-drawn doodle illustration with a simple drawn background "
     "that shows where the scene takes place, such as a room, kitchen, street, "
     "or outdoors, with a few contextual props, calm muted colors, on warm "
-    "off-white paper texture"
+    "off-white paper texture, the same thin, even line weight in every scene"
 )
 _MASCOT_ANCHOR = (
-    "Tikus Berdasi, a cartoon grey rat with a long pointed snout, big round "
-    "ears, a long tail, and half-closed eyes with a smug sly grin, wearing "
-    "a black suit, a white shirt, and a bright red necktie."
+    "Tikus Berdasi, a cartoon grey rat with FIXED consistent proportions in "
+    "every scene: a large head about half of his total height, a long "
+    "pointed snout, big round ears, a round belly, short limbs and a long "
+    "segmented tail, drawn with thin even black lineart. He always wears a "
+    "black suit jacket, a white shirt and a bright red necktie, and usually "
+    "carries a briefcase full of cash. His face uses one of five fixed "
+    "expressions: a smug sly grin with half-closed eyes (default), a gleeful "
+    "laugh while counting money, shocked wide-eyed panic when caught, a "
+    "fake innocent wide smile with both paws raised, or an angry defensive "
+    "scowl."
 )
 _NEGATIVE_TEXT = (
     "photorealistic, 3d render, gradient shading, english text, watermark, "
     "logo, blurry, cluttered background, extra limbs, realistic human face, "
-    "likeness of a real person"
+    "likeness of a real person, inconsistent character proportions, chibi "
+    "proportions, thick bold outlines, different character design, "
+    "changing face"
 )
 
 

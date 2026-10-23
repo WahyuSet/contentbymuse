@@ -47,6 +47,21 @@ async def test_default_visual_style_seeded_once(factory):
     assert style.reference_asset_id is None
     assert "rat" in style.mascot_anchor and "red necktie" in style.mascot_anchor
     assert style.mascot_anchor.endswith(".")
+    # Fase 12: jangkar mengunci proporsi + set 5 ekspresi baku.
+    assert "FIXED consistent proportions" in style.mascot_anchor
+    assert "five fixed expressions" in style.mascot_anchor
+    assert "shocked wide-eyed panic" in style.mascot_anchor
+    assert "fake innocent wide smile" in style.mascot_anchor
+    assert "angry defensive scowl" in style.mascot_anchor
+    assert "briefcase full of cash" in style.mascot_anchor
+    assert not style.mascot_anchor.endswith("..")
+    # Fase 12: bobot garis konsisten di style_text, drift karakter di negative.
+    assert "same thin, even line weight" in style.style_text
+    assert "inconsistent character proportions" in style.negative_text
+    assert "chibi proportions" in style.negative_text
+    assert "thick bold outlines" in style.negative_text
+    assert "different character design" in style.negative_text
+    assert "changing face" in style.negative_text
 
 
 async def test_project_image_columns_default_none(factory):

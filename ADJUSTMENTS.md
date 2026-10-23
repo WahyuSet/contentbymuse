@@ -79,6 +79,22 @@ TTS → video per scene → render gabung 30–40 dtk → 1 gambar thumbnail.
    (`lang_qc`) + warning job; aktif hanya bila `WHISPER_MODEL` terpasang.
    Catatan jujur: Whisper sulit membedakan id vs ms — QC menangkap drift
    kasar; penilai akhir tetap telinga pemilik.
+10. **Fase 12 (mini) — disiplin visual maskot (2026-10-23, penilaian jujur
+    pemilik: konsep tidak rebranding, eksekusi karakter yang dikunci)** —
+    seed gaya "Tikus Klasik" di `styles_seed.py`: `mascot_anchor` ditulis
+    ulang mengunci proporsi tetap (kepala besar ±setengah tinggi badan,
+    moncong panjang runcing, telinga bulat besar, perut bulat, ekor panjang
+    beruas, lineart hitam tipis rata) + set 5 ekspresi baku (smug sly grin,
+    gleeful laugh, shocked wide-eyed panic, fake innocent wide smile, angry
+    defensive scowl); `style_text` ditambah "the same thin, even line weight
+    in every scene"; `negative_text` ditambah larangan drift karakter
+    (inconsistent character proportions, chibi proportions, thick bold
+    outlines, different character design, changing face). Rasa gambar tidak
+    berubah: doodle kertas krem, dasi merah satu-satunya warna pop.
+    Pemasangan ke gaya LIVE (PATCH + referensi character sheet baru) adalah
+    gerbang terpisah menunggu persetujuan pemilik atas sheet; nilai lama
+    gaya live tersimpan di ledger
+    `.superpowers/sdd/fase-12-visual-maskot/progress.md` untuk rollback.
 
 ## Spike Fase 0 yang harus jalan sebelum angka dikunci
 
