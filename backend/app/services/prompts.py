@@ -302,13 +302,23 @@ _FLOOR_LINE = (
     "of the frame."
 )
 
+# Addendum anti-hewan (Fase 12): scene tanpa maskot sempat menarik karakter
+# hewan asing (anjing berkaos, makhluk berbulu). Klausa eksplisit ini hanya
+# untuk scene include_mascot=false — scene bermaskot tidak menerimanya
+# karena maskot kita sendiri tikus.
+_NO_ANIMAL_LINE = (
+    "This scene contains NO animal characters of any kind"
+    " — only generic human figures, objects and scenery."
+)
+
 
 async def compose_image_prompt(session, style, scene) -> str:
     """Prompt gambar final §4.8: render template image.compose (bukan LLM).
 
     Perapian gaya 6p diterapkan sejak v1 di sini: spasi style_text dirapikan,
     jangkar maskot diakhiri tepat satu titik, dan kalimat garis lantai hanya
-    untuk visual_type character/environment.
+    untuk visual_type character/environment. Klausa anti-hewan hanya untuk
+    scene tanpa maskot (addendum Fase 12).
     """
     style_text = " ".join((style.style_text or "").split())
     anchor = ""
@@ -317,6 +327,7 @@ async def compose_image_prompt(session, style, scene) -> str:
     floor_line = (
         _FLOOR_LINE if scene.visual_type in ("character", "environment") else ""
     )
+    no_animal_line = "" if scene.include_mascot else _NO_ANIMAL_LINE
     rendered = await PromptService(session).render(
         "image.compose",
         {
@@ -325,6 +336,7 @@ async def compose_image_prompt(session, style, scene) -> str:
             "visual_prompt": scene.visual_prompt,
             "visual_type": scene.visual_type,
             "floor_line": floor_line,
+            "no_animal_line": no_animal_line,
         },
     )
     text = "\n".join(message.content for message in rendered.messages)

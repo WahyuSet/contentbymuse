@@ -65,6 +65,9 @@ async def test_compose_golden(factory):
     # blok zona aman + teks selalu ada
     assert "bottom quarter" in prompt
     assert "Bahasa Indonesia" in prompt
+    # Addendum anti-hewan: scene bermaskot TIDAK menerima klausa anti-hewan
+    # (maskot kita tikus — klausa itu akan kontradiksi).
+    assert "NO animal characters" not in prompt
 
 
 async def test_compose_without_mascot_and_object_type(factory):
@@ -77,3 +80,9 @@ async def test_compose_without_mascot_and_object_type(factory):
         )
     assert "Si Klepon" not in prompt
     assert "ground line" not in prompt
+    # Addendum anti-hewan: scene tanpa maskot WAJIB memuat klausa eksplisit
+    # tanpa karakter hewan — hanya manusia generik, benda, dan latar.
+    assert (
+        "This scene contains NO animal characters of any kind"
+        " — only generic human figures, objects and scenery." in prompt
+    )
