@@ -15,6 +15,7 @@ from app.services.ffmpeg_render import run_render
 from app.services.render_plan import SceneInput, WordTiming, build_render_plan
 from app.services.render_settings import get_subtitle_style
 from app.services.subtitles import proportional_words
+from app.services.thumbnail_text import draw_keyword_text
 from app.storage.local import LocalStorage
 
 
@@ -53,6 +54,7 @@ async def render_hash_parts(
                 "transition": scene.transition,
                 "subtitle_override": scene.subtitle_override,
                 "emphasis_words": scene.emphasis_words,
+                "keyword_text": scene.keyword_text,
                 "sfx_cues": scene.sfx_cues or [],
                 "voice": [voice.id, voice.version] if voice else None,
                 "image": [image.id, image.version] if image else None,
@@ -110,6 +112,7 @@ async def run_render_job(
                     await session.commit()
                 return {"asset_id": existing.id, "cached": True}
 
+        keyword_dir = Path(tempfile.mkdtemp(prefix="keyword-"))
         scene_inputs: list[SceneInput] = []
         for scene, voice, image, timings in per_scene:
             trim = None
@@ -133,11 +136,21 @@ async def run_render_job(
                 start = trim[0] if trim else 0.0
                 end = trim[1] if trim else float(voice.duration_s or 0.0)
                 words = proportional_words(scene.voiceover, start, end)
+            image_path = await storage.local_path(image.storage_key)
+            if scene.keyword_text:
+                # Teks kata kunci di-composite lokal SEBELUM ffmpeg; plan
+                # dan perintah ffmpeg tidak berubah bentuk.
+                composited = draw_keyword_text(
+                    image_path.read_bytes(), scene.keyword_text
+                )
+                keyword_path = keyword_dir / f"scene-{scene.position}.png"
+                keyword_path.write_bytes(composited)
+                image_path = keyword_path
             scene_inputs.append(
                 SceneInput(
                     id=scene.id,
                     position=scene.position,
-                    image_path=str(await storage.local_path(image.storage_key)),
+                    image_path=str(image_path),
                     audio_path=str(await storage.local_path(voice.storage_key)),
                     trim=trim,
                     clip_duration_s=float(voice.duration_s or 0.0),
