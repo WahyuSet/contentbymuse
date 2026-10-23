@@ -62,6 +62,9 @@ async def test_default_visual_style_seeded_once(factory):
     assert "thick bold outlines" in style.negative_text
     assert "different character design" in style.negative_text
     assert "changing face" in style.negative_text
+    # Addendum anti-hewan: hewan LAIN dilarang, tanpa melawan maskot tikus.
+    assert "other cartoon animals" in style.negative_text
+    assert "animal sidekick characters" in style.negative_text
 
 
 async def test_project_image_columns_default_none(factory):

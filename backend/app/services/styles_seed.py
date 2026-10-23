@@ -28,7 +28,7 @@ _NEGATIVE_TEXT = (
     "logo, blurry, cluttered background, extra limbs, realistic human face, "
     "likeness of a real person, inconsistent character proportions, chibi "
     "proportions, thick bold outlines, different character design, "
-    "changing face"
+    "changing face, other cartoon animals, animal sidekick characters"
 )
 
 
