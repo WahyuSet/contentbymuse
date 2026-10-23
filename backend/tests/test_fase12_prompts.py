@@ -41,6 +41,14 @@ async def test_mascot_block_scale_and_presence(session):
     assert "[NO_MASCOT]" in body  # mekanisme lama tetap utuh
 
 
+async def test_mascot_block_no_mascot_scenes_have_no_other_animals(session):
+    body = await _body(session, "block.mascot")
+    # Addendum anti-hewan: scene tanpa maskot hanya manusia generik/benda/
+    # latar — jangan pernah memperkenalkan karakter hewan lain.
+    assert "never introduce any other animal character" in body
+    assert "only generic human figures, objects, and scenery" in body
+
+
 async def test_visual_rules_mascot_is_largest_figure(session):
     body = await _body(session, "block.visual_rules")
     assert "largest figure in the frame" in body
