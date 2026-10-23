@@ -98,6 +98,17 @@ def test_visual_styles_list_and_patch(world):
     assert patched.json()["version"] == 2
 
 
+def test_visual_style_patch_reference_asset(world):
+    client, ids = world
+    patched = client.patch(
+        f"/api/visual-styles/{ids['style']}",
+        json={"reference_asset_id": "01M5MW1Y2WQSMKJDB5B3B9R0HR"},
+    )
+    assert patched.status_code == 200
+    assert patched.json()["reference_asset_id"] == "01M5MW1Y2WQSMKJDB5B3B9R0HR"
+    assert patched.json()["version"] == 2
+
+
 def test_project_patch_image_pins(world):
     client, ids = world
     ok = client.patch(

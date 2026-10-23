@@ -33,6 +33,7 @@ class VisualStylePatch(BaseModel):
     style_text: str | None = None
     negative_text: str | None = None
     mascot_anchor: str | None = None
+    reference_asset_id: str | None = None
     image_params: dict[str, Any] | None = None
 
 
@@ -65,7 +66,13 @@ async def patch_visual_style(
         raise NotFoundError("Gaya visual tidak ditemukan.")
     data = body.model_dump(exclude_unset=True)
     changed = False
-    for field in ("name", "style_text", "negative_text", "mascot_anchor"):
+    for field in (
+        "name",
+        "style_text",
+        "negative_text",
+        "mascot_anchor",
+        "reference_asset_id",
+    ):
         if field in data and data[field] is not None:
             setattr(style, field, data[field])
             changed = True
