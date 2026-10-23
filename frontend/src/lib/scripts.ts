@@ -27,6 +27,7 @@ export interface Scene {
   visual_type: string;
   transition: string;
   emphasis_words: string[];
+  keyword_text: string | null;
   est_duration_s: number;
   revision: number;
 }

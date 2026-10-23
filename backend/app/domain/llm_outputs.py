@@ -36,8 +36,8 @@ class SfxCue(BaseModel):
 
 class SceneDraft(BaseModel):
     beat: str = Field(
-        pattern="^(hook|setup|main|payoff|cta|loop)$",
-        description="Peran scene dalam alur: hook, setup, main, payoff, cta, loop",
+        pattern="^(hook|setup|main|impact|payoff|cta|loop)$",
+        description="Peran scene dalam alur: hook, setup, main, impact, payoff, cta, loop",
     )
     voiceover: str = Field(description="Narasi lisan Bahasa Indonesia, 3 sampai 16 kata")
     subtitle: str | None = Field(default=None, description="Teks subtitle bila berbeda dari voiceover")
@@ -54,6 +54,11 @@ class SceneDraft(BaseModel):
     )
     emphasis_words: list[str] = Field(
         default_factory=list, description="Kata dari voiceover yang disorot di subtitle"
+    )
+    keyword_text: str | None = Field(
+        default=None,
+        max_length=24,
+        description="Teks kata kunci visual 1-3 kata (target ~18 karakter) yang di-composite lokal di atas gambar scene, mis. MSCI / IHSG -8% / PAKAN; kosongkan bila scene tidak butuh teks visual",
     )
     sfx_cues: list[SfxCue] = Field(
         default_factory=list,

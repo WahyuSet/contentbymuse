@@ -51,6 +51,7 @@ class SceneOut(BaseModel):
     visual_type: str
     transition: str
     emphasis_words: list
+    keyword_text: str | None = None
     sfx_cues: list
     est_duration_s: float
     revision: int
@@ -383,7 +384,7 @@ async def get_pipeline(project_id: str, session: SessionDep):
     return PipelineOut(project_id=project_id, stages=[script_stage, validation_stage])
 
 
-BEATS = {"hook", "setup", "main", "payoff", "cta", "loop"}
+BEATS = {"hook", "setup", "main", "impact", "payoff", "cta", "loop"}
 VISUAL_TYPES = {"character", "object", "process", "environment", "diagram", "closeup"}
 TRANSITIONS = {"cut", "crossfade", "punch_in"}
 
@@ -397,6 +398,7 @@ class ScenePatch(BaseModel):
     transition: str | None = None
     beat: str | None = None
     emphasis_words: list[str] | None = None
+    keyword_text: str | None = None
     sfx_cues: list[dict] | None = None
 
 
@@ -409,6 +411,7 @@ class SceneCreate(BaseModel):
     visual_type: str = "character"
     transition: str = "cut"
     emphasis_words: list[str] = []
+    keyword_text: str | None = None
     sfx_cues: list[dict] = []
     after_position: int | None = None
 
@@ -563,6 +566,7 @@ async def create_scene(script_id: str, body: SceneCreate, session: SessionDep):
         visual_type=body.visual_type,
         transition=body.transition,
         emphasis_words=body.emphasis_words,
+        keyword_text=body.keyword_text,
         sfx_cues=data.get("sfx_cues") or [],
         est_duration_s=estimate_scene_s(body.voiceover, WPS_DEFAULT),
     )

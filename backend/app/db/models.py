@@ -282,6 +282,7 @@ class Scene(Base):
     visual_type: Mapped[str] = mapped_column(String(16), default="character")
     transition: Mapped[str] = mapped_column(String(16), default="cut")
     emphasis_words: Mapped[list] = mapped_column(JSON, default=list)
+    keyword_text: Mapped[str | None] = mapped_column(String(64))
     sfx_cues: Mapped[list] = mapped_column(JSON, default=list)
     est_duration_s: Mapped[float] = mapped_column(default=0.0)
     revision: Mapped[int] = mapped_column(Integer, default=0)

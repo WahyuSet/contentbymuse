@@ -24,7 +24,7 @@ import {
 } from "./lib/scripts";
 
 const CHAIN_TYPES = ["script", "checks_fix", "validate", "revise"];
-const BEATS = ["hook", "setup", "main", "payoff", "cta", "loop"];
+const BEATS = ["hook", "setup", "main", "impact", "payoff", "cta", "loop"];
 
 function SceneRow({
   scene,
@@ -50,12 +50,14 @@ function SceneRow({
   const [visualPrompt, setVisualPrompt] = useState(scene.visual_prompt);
   const [beat, setBeat] = useState(scene.beat);
   const [mascot, setMascot] = useState(scene.include_mascot);
+  const [keywordText, setKeywordText] = useState(scene.keyword_text ?? "");
 
   useEffect(() => {
     setVoiceover(scene.voiceover);
     setVisualPrompt(scene.visual_prompt);
     setBeat(scene.beat);
     setMascot(scene.include_mascot);
+    setKeywordText(scene.keyword_text ?? "");
   }, [scene]);
 
   const invalidate = () => {
@@ -69,6 +71,7 @@ function SceneRow({
         visual_prompt: visualPrompt,
         beat,
         include_mascot: mascot,
+        keyword_text: keywordText.trim() ? keywordText : null,
       }),
     onSuccess: invalidate,
   });
@@ -105,7 +108,8 @@ function SceneRow({
     voiceover !== scene.voiceover ||
     visualPrompt !== scene.visual_prompt ||
     beat !== scene.beat ||
-    mascot !== scene.include_mascot;
+    mascot !== scene.include_mascot ||
+    keywordText !== (scene.keyword_text ?? "");
 
   return (
     <div className="scene-row">
@@ -149,6 +153,14 @@ function SceneRow({
           value={visualPrompt}
           disabled={!editable}
           onChange={(e) => setVisualPrompt(e.target.value)}
+        />
+      </label>
+      <label>
+        Teks kata kunci visual
+        <input
+          value={keywordText}
+          disabled={!editable}
+          onChange={(e) => setKeywordText(e.target.value)}
         />
       </label>
       <label className="checkbox-label">

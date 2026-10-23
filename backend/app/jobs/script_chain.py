@@ -110,6 +110,7 @@ async def save_draft(
                 visual_type=scene.visual_type,
                 transition=scene.transition,
                 emphasis_words=list(scene.emphasis_words),
+                keyword_text=scene.keyword_text,
                 sfx_cues=sfx_catalog.sanitize_sfx_cues(
                     [cue.model_dump() for cue in scene.sfx_cues], scene.voiceover
                 ),
@@ -137,6 +138,7 @@ def draft_payload(script: Script, scenes: list[Scene]) -> dict:
                 "visual_type": s.visual_type,
                 "transition": s.transition,
                 "emphasis_words": s.emphasis_words,
+                "keyword_text": s.keyword_text,
             }
             for s in scenes
         ],
