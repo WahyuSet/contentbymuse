@@ -65,6 +65,20 @@ async def test_script_generate_includes_fase11_blocks(session):
     assert "fragmen" in joined
 
 
+async def test_validate_script_active_is_v4_with_spoken_fluency(session):
+    await sync_prompts(session)
+    await session.commit()
+    service = PromptService(session)
+    version = await service._active_version("validate.script")
+    assert version.version == 4
+    body = await service.active_body("validate.script")
+    # (g) Spoken fluency (keluwesan tuturan)
+    assert "fluency" in body.lower() or "keluwesan" in body.lower()
+    # contoh buruk verbatim dari video test data center (tiga fragmen)
+    assert "pajak masuk, data pulang kampung" in body
+    assert "PLN pelanggan raksasa, pajak masuk, data pulang kampung" in body
+
+
 async def test_script_fix_and_revise_include_fase11_blocks(session):
     fix_inputs = dict(
         SCRIPT_INPUTS, draft={"title": "x", "scenes": []}, issues=[]
