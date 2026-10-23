@@ -391,6 +391,91 @@ def run_checks(
                 f"(ternyata/padahal/faktanya/dst); {detail}.",
             ))
 
+    # CTA biner (Fase 10): scene penutup (beat cta/loop) wajib pertanyaan
+    # dua pilihan berlawanan "(… atau …?)", bukan pertanyaan terbuka generik.
+    # Aktif untuk semua kategori yang diketahui; error khusus politik,
+    # kategori lain warning. Tanpa kategori (None) cek ini nonaktif total.
+    if category_slug is not None and n:
+        last_beat = _field(scenes[-1], "beat", "")
+        if last_beat in ("cta", "loop"):
+            severity = "error" if category_slug == "politics" else "warning"
+            closing = voiceovers[-1]
+            reasons: list[str] = []
+            if "?" not in closing:
+                reasons.append("tanpa tanda tanya")
+                segment = closing.strip().rstrip(".!")
+            else:
+                q_index = closing.rfind("?")
+                start = max(
+                    closing.rfind(".", 0, q_index),
+                    closing.rfind("!", 0, q_index),
+                    closing.rfind("?", 0, q_index),
+                ) + 1
+                segment = closing[start:q_index]
+            atau_matches = list(
+                re.finditer(r"\batau\b", segment, flags=re.IGNORECASE)
+            )
+            if not atau_matches:
+                reasons.append("tanpa kata 'atau'")
+            else:
+                match = atau_matches[-1]
+
+                def _side_tokens(text: str) -> list[str]:
+                    return [
+                        t.strip(".,!?;:\"'()").lower()
+                        for t in text.split()
+                        if t.strip(".,!?;:\"'()")
+                    ]
+
+                left_tokens = _side_tokens(segment[: match.start()])
+                right_tokens = _side_tokens(segment[match.end():])
+                if len(left_tokens) < 2 or len(right_tokens) < 2:
+                    reasons.append(
+                        "sisi pertanyaan terlalu pendek, masing-masing sisi "
+                        "'atau' wajib minimal 2 kata "
+                        f"(kiri {len(left_tokens)} kata, "
+                        f"kanan {len(right_tokens)} kata)"
+                    )
+                elif left_tokens == right_tokens:
+                    reasons.append("kedua sisi 'atau' identik")
+            if reasons:
+                issues.append(CheckIssue(
+                    "binary_cta", severity, position_of(n - 1, scenes[-1]),
+                    "Scene penutup wajib pertanyaan biner dua pilihan "
+                    "berlawanan (… atau …?), bukan pertanyaan terbuka "
+                    f"generik; {'; '.join(reasons)}.",
+                ))
+
+    # Penanda keadilan (Fase 10): khusus politik dan hanya bila ada tepat 1
+    # scene twist (selain itu diam — itu urusan twist_structure). Salah satu
+    # voiceover dari scene twist sampai sebelum impact pertama (atau sebelum
+    # scene terakhir bila tidak ada impact) wajib memuat kalimat adil /
+    # steelman berpenanda.
+    if category_slug == "politics" and n:
+        fairness_markers = (
+            "biar adil", "adilnya", "masuk akal", "sisi baiknya", "untungnya",
+        )
+        beats = [_field(s, "beat", "") for s in scenes]
+        twist_idx = [i for i, b in enumerate(beats) if b == "twist"]
+        if len(twist_idx) == 1:
+            impact_idx = [i for i, b in enumerate(beats) if b == "impact"]
+            start = twist_idx[0]
+            end = impact_idx[0] if impact_idx else n - 1
+            in_range = voiceovers[start:end] if end > start else []
+            if not any(
+                marker in vo.lower()
+                for vo in in_range
+                for marker in fairness_markers
+            ):
+                issues.append(CheckIssue(
+                    "fairness_marker", "warning", None,
+                    "Sisipkan satu kalimat adil/steelman di sekitar twist "
+                    "(dari scene twist sampai sebelum impact pertama), mis. "
+                    "'biar adil …' / 'adilnya … masuk akal …' / 'sisi "
+                    "baiknya …'; belum ditemukan penanda keadilan (biar "
+                    "adil/adilnya/masuk akal/sisi baiknya/untungnya).",
+                ))
+
     # Satu kalimat induk (Fase 9): judul dan hook scene 1 harus parafrasa dekat
     # (Jaccard token >= 0,5), pola yang sama dengan cek duplicate_voiceover.
     if title and n:

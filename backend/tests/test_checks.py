@@ -347,3 +347,157 @@ def test_twist_structure_other_markers_pass():
         assert "twist_structure" not in codes(
             run_checks(scenes(rows), category_slug="politics")
         )
+
+
+# --- Fase 10 T3: CTA biner + penanda keadilan ---
+
+POLITICS_BINARY_OK = [
+    ("hook", "Klaim pejabat harga pangan turun warga lega", "character", True),
+    ("setup", "Pedagang pasar tersenyum mendengar kabar baik itu", "environment", True),
+    ("main", "Harga beras diumumkan lebih murah dari sebelumnya", "closeup", False),
+    ("main", "Banyak keluarga berharap belanja dapur makin ringan", "character", True),
+    ("twist", "Ternyata biar adil klaim itu keliru warga menanggung", "diagram", False),
+    ("impact", "Harga mi dan telur tetap mahal di pasar", "environment", True),
+    ("impact", "Uang belanja keluarga habis lebih cepat tiap pekan", "closeup", True),
+    ("payoff", "Janji murah ternyata hanya cerita di panggung", "character", False),
+    ("payoff", "Warga kecil kembali menahan lapar malam ini", "environment", True),
+    ("cta", "Langkah cerdas hemat subsidi atau cuma ganti kemasan doang?", "character", True),
+]
+
+
+def politics_with_cta(voiceover):
+    rows = list(POLITICS_BINARY_OK)
+    rows[9] = ("cta", voiceover, POLITICS_BINARY_OK[9][2], POLITICS_BINARY_OK[9][3])
+    return rows
+
+
+def test_binary_cta_passes_for_politics_binary_question():
+    issues = [
+        i for i in run_checks(scenes(POLITICS_BINARY_OK), category_slug="politics")
+        if i.code == "binary_cta"
+    ]
+    assert issues == []
+
+
+def test_binary_cta_generic_closing_is_error_for_politics():
+    rows = politics_with_cta("Menurut lo gimana? Tulis pendapat lo.")
+    issues = [
+        i for i in run_checks(scenes(rows), category_slug="politics")
+        if i.code == "binary_cta"
+    ]
+    assert len(issues) == 1
+    assert issues[0].severity == "error"
+
+
+def test_binary_cta_without_question_mark_is_error_for_politics():
+    rows = politics_with_cta(
+        "Langkah cerdas hemat subsidi atau cuma ganti kemasan doang"
+    )
+    issues = [
+        i for i in run_checks(scenes(rows), category_slug="politics")
+        if i.code == "binary_cta"
+    ]
+    assert len(issues) == 1
+    assert issues[0].severity == "error"
+
+
+def test_binary_cta_short_side_is_error_for_politics():
+    rows = politics_with_cta("Setuju atau tidak?")
+    issues = [
+        i for i in run_checks(scenes(rows), category_slug="politics")
+        if i.code == "binary_cta"
+    ]
+    assert len(issues) == 1
+    assert issues[0].severity == "error"
+
+
+def test_binary_cta_identical_sides_is_error_for_politics():
+    rows = politics_with_cta("Hemat subsidi warga atau hemat subsidi warga?")
+    issues = [
+        i for i in run_checks(scenes(rows), category_slug="politics")
+        if i.code == "binary_cta"
+    ]
+    assert len(issues) == 1
+    assert issues[0].severity == "error"
+
+
+def test_binary_cta_generic_closing_is_warning_for_non_politics():
+    issues = [
+        i for i in run_checks(scenes(), category_slug="animals")
+        if i.code == "binary_cta"
+    ]
+    assert len(issues) == 1
+    assert issues[0].severity == "warning"
+
+
+def test_binary_cta_skipped_without_category():
+    assert "binary_cta" not in codes(run_checks(scenes()))
+    assert run_checks(scenes()) == []
+
+
+def test_binary_cta_skipped_when_last_beat_not_cta_or_loop():
+    rows = list(CLEAN)
+    rows[9] = ("payoff", CLEAN[9][1], CLEAN[9][2], CLEAN[9][3])
+    assert "binary_cta" not in codes(
+        run_checks(scenes(rows), category_slug="animals")
+    )
+
+
+def test_binary_cta_applies_to_loop_closing():
+    rows = list(CLEAN)
+    rows[9] = ("loop", CLEAN[9][1], CLEAN[9][2], CLEAN[9][3])
+    issues = [
+        i for i in run_checks(scenes(rows), category_slug="animals")
+        if i.code == "binary_cta"
+    ]
+    assert len(issues) == 1
+    assert issues[0].severity == "warning"
+
+
+def test_fairness_marker_passes_when_twist_has_marker():
+    assert "fairness_marker" not in codes(
+        run_checks(scenes(POLITICS_BINARY_OK), category_slug="politics")
+    )
+
+
+def test_fairness_marker_warns_when_no_marker_in_range():
+    issues = [
+        i for i in run_checks(scenes(TWIST_OK), category_slug="politics")
+        if i.code == "fairness_marker"
+    ]
+    assert len(issues) == 1
+    assert issues[0].severity == "warning"
+
+
+def test_fairness_marker_passes_when_marker_between_twist_and_impact():
+    rows = [
+        ("hook", "Klaim pejabat harga pangan turun warga lega", "character", True),
+        ("setup", "Pedagang pasar tersenyum mendengar kabar baik itu", "environment", True),
+        ("main", "Harga beras diumumkan lebih murah dari sebelumnya", "closeup", False),
+        ("main", "Banyak keluarga berharap belanja dapur makin ringan", "character", True),
+        ("twist", "Ternyata klaim itu keliru dan warga yang menanggung", "diagram", False),
+        ("payoff", "Adilnya rencana ini masuk akal untuk kas negara", "character", True),
+        ("impact", "Harga mi dan telur tetap mahal di pasar", "environment", True),
+        ("impact", "Uang belanja keluarga habis lebih cepat tiap pekan", "closeup", True),
+        ("payoff", "Warga kecil kembali menahan lapar malam ini", "environment", False),
+        ("cta", "Menurutmu kebijakan ini menolong siapa sebenarnya kawan", "character", True),
+    ]
+    assert "fairness_marker" not in codes(
+        run_checks(scenes(rows), category_slug="politics")
+    )
+
+
+def test_fairness_marker_skipped_for_non_politics_and_without_twist():
+    assert "fairness_marker" not in codes(
+        run_checks(scenes(), category_slug="animals")
+    )
+    assert "fairness_marker" not in codes(
+        run_checks(
+            scenes(with_beats(POLITICS_OK_BEATS)), category_slug="politics"
+        )
+    )
+    rows = list(TWIST_OK)
+    rows[8] = ("twist", TWIST_OK[8][1], TWIST_OK[8][2], TWIST_OK[8][3])
+    assert "fairness_marker" not in codes(
+        run_checks(scenes(rows), category_slug="politics")
+    )
