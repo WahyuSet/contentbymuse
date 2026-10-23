@@ -68,6 +68,99 @@ def _token_set(text: str) -> set[str]:
     return {t.strip(".,!?").lower() for t in text.split() if t.strip(".,!?")}
 
 
+# --- Ekstraktor angka kunci (Fase 9): digit + ejaan Indonesia ---
+
+_DIGIT_RE = re.compile(r"\d+(?:,\d+)?")
+_WORD_TOKEN_RE = re.compile(r"[a-z]+")
+_ID_UNITS = {
+    "satu": 1, "dua": 2, "tiga": 3, "empat": 4, "lima": 5,
+    "enam": 6, "tujuh": 7, "delapan": 8, "sembilan": 9,
+}
+_ID_SCALES = {
+    "ribu": 1_000, "juta": 1_000_000,
+    "miliar": 1_000_000_000, "triliun": 1_000_000_000_000,
+}
+
+
+def _parse_below_hundred(tokens: list[str], i: int):
+    """Parse frasa angka <100 mulai di tokens[i]; kembalikan (nilai, indeks lanjut) atau None."""
+    if i >= len(tokens):
+        return None
+    tok = tokens[i]
+    if tok == "sepuluh":
+        return (10, i + 1)
+    if tok == "sebelas":
+        return (11, i + 1)
+    if tok in _ID_UNITS:
+        unit = _ID_UNITS[tok]
+        nxt = tokens[i + 1] if i + 1 < len(tokens) else None
+        if nxt == "belas":
+            return (10 + unit, i + 2)
+        if nxt == "puluh":
+            value, j = unit * 10, i + 2
+            if j < len(tokens) and tokens[j] in _ID_UNITS:
+                value += _ID_UNITS[tokens[j]]
+                j += 1
+            return (value, j)
+        return (unit, i + 1)
+    return None
+
+
+def _parse_below_thousand(tokens: list[str], i: int):
+    """Seperti _parse_below_hundred, plus bentuk ratus (seratus / <unit> ratus)."""
+    if i < len(tokens) and tokens[i] == "seratus":
+        rest = _parse_below_hundred(tokens, i + 1)
+        return (100 + rest[0], rest[1]) if rest else (100, i + 1)
+    if i + 1 < len(tokens) and tokens[i] in _ID_UNITS and tokens[i + 1] == "ratus":
+        base = _ID_UNITS[tokens[i]] * 100
+        rest = _parse_below_hundred(tokens, i + 2)
+        return (base + rest[0], rest[1]) if rest else (base, i + 2)
+    return _parse_below_hundred(tokens, i)
+
+
+def _parse_number_at(tokens: list[str], i: int):
+    """Parse SATU frasa angka di tokens[i], kecocokan terpanjang dulu.
+
+    Kata skala (ribu/juta/miliar/triliun) yang mengikuti ikut jadi pengali,
+    jadi "tiga puluh satu triliun" adalah satu angka 31 triliun, bukan dua.
+    """
+    if tokens[i] == "seribu":
+        value, j = 1_000, i + 1
+    else:
+        parsed = _parse_below_thousand(tokens, i)
+        if parsed is None:
+            return None
+        value, j = parsed
+    if j < len(tokens) and tokens[j] in _ID_SCALES:
+        value *= _ID_SCALES[tokens[j]]
+        j += 1
+    return (value, j)
+
+
+def extract_key_numbers(text: str) -> set:
+    """Himpunan angka kunci dalam teks VO: bentuk digit ("11", "2,1", "2027")
+    dan ejaan Indonesia ("sebelas", "tiga puluh satu triliun", "sembilan ratus ribu").
+    Nilai dinormalisasi (koma desimal -> float; ejaan termasuk skala -> int)."""
+    found: set = set()
+    for match in _DIGIT_RE.finditer(text or ""):
+        raw = match.group(0)
+        found.add(float(raw.replace(",", ".")) if "," in raw else int(raw))
+    tokens = _WORD_TOKEN_RE.findall((text or "").lower())
+    i = 0
+    while i < len(tokens):
+        parsed = _parse_number_at(tokens, i)
+        if parsed is None:
+            i += 1
+        else:
+            value, i = parsed
+            found.add(value)
+    return found
+
+
+def _format_number(value) -> str:
+    return str(value).replace(".", ",") if isinstance(value, float) else str(value)
+
+
 def _tts_risk_detail(voiceover: str) -> str | None:
     for symbol in _TTS_SYMBOLS:
         if symbol in voiceover:
@@ -227,6 +320,17 @@ def run_checks(
         issues.append(CheckIssue(
             "repeated_opener", "warning", position_of(index, scenes[index]),
             "Kata 'jadi' membuka lebih dari satu scene; pembuka terasa monoton."))
+
+    key_numbers: set = set()
+    for voiceover in voiceovers:
+        key_numbers |= extract_key_numbers(voiceover)
+    if len(key_numbers) > 3:
+        listed = ", ".join(_format_number(v) for v in sorted(key_numbers))
+        issues.append(CheckIssue(
+            "number_budget", "error", None,
+            f"Angka kunci berbeda ada {len(key_numbers)} ({listed}), melebihi budget "
+            "maksimal 3 angka kunci per video; ulangi angka yang sama atau potong angka lain.",
+        ))
 
     if format_slug == "top-list":
         markers = ["pertama", "kedua", "ketiga"]

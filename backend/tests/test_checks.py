@@ -1,4 +1,4 @@
-from app.domain.script_rules import run_checks
+from app.domain.script_rules import extract_key_numbers, run_checks
 
 CLEAN = [
     ("hook", "Kenapa cicak sengaja memutus ekornya sendiri", "character", True),
@@ -119,3 +119,51 @@ def test_numbered_points_only_for_top_list():
     assert "numbered_points" not in codes(run_checks(scenes(rows), format_slug="top-list"))
     assert "numbered_points" in codes(run_checks(scenes(), format_slug="top-list"))
     assert "numbered_points" not in codes(run_checks(scenes()))
+
+
+# --- Fase 9 T2: budget angka kunci ---
+
+
+def test_extract_digit_numbers():
+    found = extract_key_numbers("Denda 11 miliar dan 2,1 triliun di tahun 2027")
+    assert found == {11, 2.1, 2027}
+
+
+def test_extract_spelled_numbers():
+    assert extract_key_numbers("Sebelas korporasi ditetapkan sebagai tersangka") == {11}
+    assert extract_key_numbers("Dua belas orang ikut diperiksa penyidik") == {12}
+    assert extract_key_numbers("Seratus warga antre sejak pagi hari") == {100}
+    assert extract_key_numbers("Dua ratus lima puluh warga terdampak langsung") == {250}
+
+
+def test_extract_spelled_compound_and_scale_as_one_number():
+    found = extract_key_numbers("Anggaran tiga puluh satu triliun rupiah bocor")
+    assert found == {31_000_000_000_000}
+    assert extract_key_numbers("Sembilan ratus ribu warga kehilangan layanan") == {900_000}
+    assert extract_key_numbers("Lima ribu orang menunggu kepastian") == {5_000}
+
+
+def test_extract_numbers_dedupes_repeats():
+    found = extract_key_numbers("Angka 11 muncul lagi, tetap 11 dan sebelas")
+    assert found == {11}
+
+
+def test_number_budget_passes_at_exactly_three_distinct():
+    rows = list(CLEAN)
+    rows[2] = ("main", "Denda 11 miliar dijatuhkan ke korporasi nakal", "character", False)
+    rows[3] = ("main", "Sebanyak 132 warga ikut menandatangani petisi penolakan", "environment", True)
+    rows[4] = ("main", "Aturan baru berlaku penuh mulai tahun 2027 mendatang", "process", True)
+    assert "number_budget" not in codes(run_checks(scenes(rows)))
+
+
+def test_number_budget_fails_at_four_distinct():
+    rows = list(CLEAN)
+    rows[2] = ("main", "Denda 11 miliar dijatuhkan ke korporasi nakal", "character", False)
+    rows[3] = ("main", "Sebanyak 132 warga ikut menandatangani petisi penolakan", "environment", True)
+    rows[4] = ("main", "Aturan baru berlaku penuh mulai tahun 2027 mendatang", "process", True)
+    rows[5] = ("main", "Lima puluh warga lainnya masih menunggu kepastian hukum", "diagram", False)
+    issues = [i for i in run_checks(scenes(rows)) if i.code == "number_budget"]
+    assert len(issues) == 1
+    assert issues[0].severity == "error"
+    assert issues[0].scene_position is None
+    assert "4" in issues[0].message
