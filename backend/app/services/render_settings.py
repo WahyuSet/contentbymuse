@@ -8,13 +8,15 @@ FONTS_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
 FONT_FILE = FONTS_DIR / "PlusJakartaSans-ExtraBold.ttf"
 
 # Gaya subtitle bawaan (Spec §8.5): Plus Jakarta Sans ExtraBold 78px, putih
-# outline hitam 6px, rata tengah, garis dasar y=1340 -> marginV 1920-1340=580.
+# outline hitam 6px, rata tengah, garis dasar y=1520 -> marginV 1920-1520=400.
+# Posisi lebih rendah sesuai vonis pemilik Fase 11; tetap di atas zona UI
+# ±15% terbawah.
 DEFAULT_SUBTITLE_STYLE: dict = {
     "font": "Plus Jakarta Sans",
     "font_file": "PlusJakartaSans-ExtraBold.ttf",
     "size": 78,
     "outline": 6,
-    "margin_v": 580,
+    "margin_v": 400,
     "max_width_px": 940,
     "max_chars": 28,
     "emphasis_color": "#FFD84D",

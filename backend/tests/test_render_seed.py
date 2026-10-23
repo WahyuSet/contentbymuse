@@ -24,7 +24,7 @@ async def test_subtitle_style_seeded_and_idempotent(factory):
         await session.commit()
     assert style["size"] == 78
     assert style["outline"] == 6
-    assert style["margin_v"] == 580
+    assert style["margin_v"] == 400
     async with factory() as session:
         again = await get_subtitle_style(session)
         row = await session.get(AppSetting, "subtitle_style")
