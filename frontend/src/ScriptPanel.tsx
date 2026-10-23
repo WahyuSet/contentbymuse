@@ -11,6 +11,8 @@ import {
 import {
   addScene,
   approveScript,
+  BEATS,
+  beatLabel,
   deleteScene,
   fetchScriptDetail,
   fetchScripts,
@@ -24,7 +26,6 @@ import {
 } from "./lib/scripts";
 
 const CHAIN_TYPES = ["script", "checks_fix", "validate", "revise"];
-const BEATS = ["hook", "setup", "main", "impact", "payoff", "cta", "loop"];
 
 function SceneRow({
   scene,
@@ -133,7 +134,7 @@ function SceneRow({
         <select value={beat} disabled={!editable} onChange={(e) => setBeat(e.target.value)}>
           {BEATS.map((option) => (
             <option key={option} value={option}>
-              {option}
+              {beatLabel(option)}
             </option>
           ))}
         </select>

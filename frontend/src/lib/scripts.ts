@@ -133,6 +133,25 @@ export function reorderScenes(
   return post(`/api/scripts/${scriptId}/scenes/reorder`, { scene_ids: sceneIds });
 }
 
+export const BEATS = [
+  "hook",
+  "setup",
+  "main",
+  "twist",
+  "impact",
+  "payoff",
+  "cta",
+  "loop",
+];
+
+export const BEAT_LABELS: Record<string, string> = {
+  twist: "Twist / Koreksi",
+};
+
+export function beatLabel(beat: string): string {
+  return BEAT_LABELS[beat] ?? beat;
+}
+
 const STATUS_LABELS: Record<string, string> = {
   draft: "Draf",
   validated: "Tervalidasi",
