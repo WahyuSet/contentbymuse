@@ -183,6 +183,8 @@ def run_checks(
     target_min_s: int = 30,
     target_max_s: int = 40,
     format_slug: str | None = None,
+    category_slug: str | None = None,
+    title: str | None = None,
 ) -> list[CheckIssue]:
     """Cek otomatis script (Spec §4.3). Murni: tidak menyentuh database."""
     scenes = list(scenes)
@@ -331,6 +333,45 @@ def run_checks(
             f"Angka kunci berbeda ada {len(key_numbers)} ({listed}), melebihi budget "
             "maksimal 3 angka kunci per video; ulangi angka yang sama atau potong angka lain.",
         ))
+
+    # Beat impact (Fase 9): hanya kategori politik — slug "politics" dari
+    # prompts/categories/politics.md ("Politik & Kebijakan"). Wajib TEPAT 2
+    # scene beat "impact" di zona dampak: sesudah minimal satu scene "main"
+    # dan sebelum scene terakhir bila scene terakhir adalah cta/loop.
+    if category_slug == "politics" and n:
+        beats = [_field(s, "beat", "") for s in scenes]
+        impact_idx = [i for i, b in enumerate(beats) if b == "impact"]
+        main_idx = [i for i, b in enumerate(beats) if b == "main"]
+        ends_with_closing = beats[-1] in ("cta", "loop")
+        placed = (
+            len(impact_idx) == 2
+            and bool(main_idx)
+            and all(i > main_idx[0] for i in impact_idx)
+            and (not ends_with_closing or all(i < n - 1 for i in impact_idx))
+        )
+        if not placed:
+            issues.append(CheckIssue(
+                "impact_chain", "error", None,
+                f"Kategori politik wajib punya tepat 2 scene beat impact sesudah scene main "
+                f"dan sebelum penutup; ditemukan {len(impact_idx)} scene impact. "
+                "Rantai dampak harus sampai ke dapur/dompet dan tabungan/masa depan warga.",
+            ))
+
+    # Satu kalimat induk (Fase 9): judul dan hook scene 1 harus parafrasa dekat
+    # (Jaccard token >= 0,5), pola yang sama dengan cek duplicate_voiceover.
+    if title and n:
+        title_tokens = _token_set(title)
+        hook_tokens = token_sets[0]
+        union = title_tokens | hook_tokens
+        if title_tokens and hook_tokens and union:
+            jaccard = len(title_tokens & hook_tokens) / len(union)
+            if jaccard < 0.5:
+                issues.append(CheckIssue(
+                    "title_hook_mismatch", "error", position_of(0, scenes[0]),
+                    f"Judul dan hook scene 1 terlalu berbeda (kemiripan kata "
+                    f"{jaccard:.2f}, wajib minimal 0,5); judul, hook, dan thumbnail "
+                    "harus satu kalimat induk yang sama.",
+                ))
 
     if format_slug == "top-list":
         markers = ["pertama", "kedua", "ketiga"]

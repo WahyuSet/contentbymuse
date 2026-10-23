@@ -46,7 +46,7 @@ async def _setup(factory, *, max_revisions=None):
         await session.flush()
         idea = ContentIdea(
             project_id=project.id, batch=1, position=1,
-            title="Kenapa cicak bisa menempel di dinding dan tidak jatuh",
+            title="Rahasia besar di balik cicak bisa menempel di dinding",
             angle="Rambut mikroskopis.", hook="Pernah lihat cicak di langit-langit?",
             job_id="01JIDEA",
         )

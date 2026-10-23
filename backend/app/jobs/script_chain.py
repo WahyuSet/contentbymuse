@@ -165,14 +165,21 @@ async def calibrated_wps(session: AsyncSession, project: Project) -> float:
 
 
 async def checks_for(session: AsyncSession, project: Project, script: Script) -> list:
+    from app.db.models import Category
+
     scenes = await load_scenes(session, script.id)
     fmt = await session.get(Format, project.format_id) if project.format_id else None
+    category = (
+        await session.get(Category, project.category_id) if project.category_id else None
+    )
     return run_checks(
         scenes,
         wps=await calibrated_wps(session, project),
         target_min_s=project.target_min_s,
         target_max_s=project.target_max_s,
         format_slug=fmt.slug if fmt else None,
+        category_slug=category.slug if category else None,
+        title=script.title,
     )
 
 

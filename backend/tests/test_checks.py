@@ -167,3 +167,99 @@ def test_number_budget_fails_at_four_distinct():
     assert issues[0].severity == "error"
     assert issues[0].scene_position is None
     assert "4" in issues[0].message
+
+
+# --- Fase 9 T3: beat impact politik + Jaccard judul-hook ---
+
+
+def with_beats(beats):
+    return [
+        (beat, CLEAN[i][1], CLEAN[i][2], CLEAN[i][3])
+        for i, beat in enumerate(beats)
+    ]
+
+
+POLITICS_OK_BEATS = [
+    "hook", "setup", "main", "main", "main", "main",
+    "impact", "impact", "payoff", "cta",
+]
+
+
+def test_impact_chain_required_for_politics():
+    issues = [i for i in run_checks(scenes(), category_slug="politics") if i.code == "impact_chain"]
+    assert len(issues) == 1
+    assert issues[0].severity == "error"
+
+
+def test_impact_chain_passes_with_two_placed_impacts():
+    rows = with_beats(POLITICS_OK_BEATS)
+    assert "impact_chain" not in codes(run_checks(scenes(rows), category_slug="politics"))
+
+
+def test_impact_chain_single_impact_fails():
+    beats = list(POLITICS_OK_BEATS)
+    beats[7] = "payoff"
+    assert "impact_chain" in codes(run_checks(scenes(with_beats(beats)), category_slug="politics"))
+
+
+def test_impact_chain_wrong_zone_fails():
+    beats = ["hook", "impact", "impact", "main", "main", "main", "main", "payoff", "payoff", "cta"]
+    assert "impact_chain" in codes(run_checks(scenes(with_beats(beats)), category_slug="politics"))
+
+
+def test_impact_chain_skipped_for_non_politics():
+    assert "impact_chain" not in codes(run_checks(scenes(), category_slug="animals"))
+    assert "impact_chain" not in codes(run_checks(scenes()))
+
+
+def test_title_hook_match_passes():
+    title = CLEAN[0][1]
+    assert "title_hook_mismatch" not in codes(run_checks(scenes(), title=title))
+
+
+def test_title_hook_unrelated_fails():
+    issues = [
+        i for i in run_checks(scenes(), title="Resep rendang terenak untuk keluarga besar")
+        if i.code == "title_hook_mismatch"
+    ]
+    assert len(issues) == 1
+    assert issues[0].severity == "error"
+    assert issues[0].scene_position == 1
+
+
+def test_title_hook_skipped_without_title():
+    assert "title_hook_mismatch" not in codes(run_checks(scenes(), title=None))
+    assert "title_hook_mismatch" not in codes(run_checks(scenes()))
+
+
+def test_extract_key_numbers_task_cases():
+    assert extract_key_numbers("11") == {11}
+    assert extract_key_numbers("2,1") == {2.1}
+    assert extract_key_numbers("sebelas") == {11}
+    assert extract_key_numbers("dua belas") == {12}
+    assert extract_key_numbers("tiga puluh satu") == {31}
+    assert extract_key_numbers("seratus") == {100}
+    assert extract_key_numbers("sembilan ratus") == {900}
+    assert extract_key_numbers("tiga puluh satu triliun") == {31_000_000_000_000}
+    assert extract_key_numbers("sembilan ratus ribu") == {900_000}
+    assert extract_key_numbers("sebelas persen dan sebelas lagi") == {11}
+
+
+def test_number_budget_four_distinct_spelled_is_one_error():
+    rows = list(CLEAN)
+    rows[1] = ("setup", "Denda sebelas persen membuat warga kaget sekali", "closeup", True)
+    rows[2] = ("main", "Total kerugian dua belas triliun rupiah tercatat", "character", False)
+    rows[3] = ("main", "Harga naik tiga puluh satu ribu per kilo", "environment", True)
+    rows[4] = ("main", "Sembilan ratus warga antre sejak pagi hari", "process", True)
+    issues = [i for i in run_checks(scenes(rows)) if i.code == "number_budget"]
+    assert len(issues) == 1
+    assert issues[0].severity == "error"
+
+
+def test_number_budget_three_distinct_with_repeats_passes():
+    rows = list(CLEAN)
+    rows[1] = ("setup", "Denda sebelas persen membuat warga kaget sekali", "closeup", True)
+    rows[2] = ("main", "Angka sebelas itu diulang lagi di sini", "character", False)
+    rows[3] = ("main", "Total kerugian dua belas triliun rupiah tercatat", "environment", True)
+    rows[4] = ("main", "Harga naik tiga puluh satu ribu per kilo", "process", True)
+    assert "number_budget" not in codes(run_checks(scenes(rows)))

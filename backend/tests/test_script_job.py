@@ -33,7 +33,7 @@ async def _setup(factory):
             project_id=project.id,
             batch=1,
             position=1,
-            title="Kenapa cicak bisa menempel di dinding dan tidak jatuh",
+            title="Cicak bisa menempel di dinding",
             angle="Jawaban singkatnya: rambut mikroskopis di telapak kaki.",
             hook="Pernah lihat cicak berjalan di langit-langit?",
             job_id="01JIDEA",
