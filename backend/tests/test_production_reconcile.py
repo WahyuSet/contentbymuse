@@ -33,7 +33,9 @@ async def _seed(tmp_path, *, status="approved"):
             quirks={"default_voice": "fake-1"}, enabled=True, priority=100,
         )
         session.add(provider)
-        project = Project(title="Cicak", topic="cicak")
+        # Project warisan: klip fixture di-hash dengan voice_settings {} (dibuat
+        # sebelum bawaan speed 110), jadi seed harus menetapkannya eksplisit.
+        project = Project(title="Cicak", topic="cicak", voice_settings={})
         session.add(project)
         await session.flush()
         idea = ContentIdea(
