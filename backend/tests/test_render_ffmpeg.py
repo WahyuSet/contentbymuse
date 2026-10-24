@@ -47,11 +47,74 @@ def test_command_shape_cut():
     assert args[0] == "ffmpeg"
     assert "zoompan" in joined
     assert "scale=2160:3840" in joined
-    assert "concat=n=2:v=1:a=0" in joined
+    # Fase 13: semua batas memakai xfade (bukan lagi concat hard-cut).
+    assert "xfade=transition=fade:duration=0.3500" in joined
+    assert "concat=n=2:v=1:a=0" not in joined
     assert "loudnorm=I=-14:TP=-1.5:LRA=11" in joined
     assert "ass=filename='/kerja/subtitles.ass':fontsdir='/app/assets/fonts'" in joined
     assert args[-1] == "/kerja/video.mp4"
     assert "h264_nvenc" not in joined
+
+
+def test_command_strong_zoom_and_beat_punch_in():
+    from app.services.render_ffmpeg import _zoompan
+    from app.services.render_plan import RenderScene
+
+    def _rs(motion):
+        return RenderScene(
+            position=1, image_path="/i.png", audio_path="/a.mp3",
+            audio_trim=(0.0, 3.0), start_s=0.0, duration_s=3.0,
+            motion=motion, transition_in="cut", words=[],
+        )
+
+    # Fase 13: zoom 22% (dulu 8%), pan pada zoom dasar 1.22.
+    assert "1+0.22*on" in _zoompan(_rs("zoom_in"))
+    assert "1.22-0.22*on" in _zoompan(_rs("zoom_out"))
+    assert "1.22" in _zoompan(_rs("pan_left"))
+    assert "if(lt(on,12),1+0.15*on/12,1.15)" in _zoompan(_rs("punch_in"))
+
+    plan = build_render_plan(
+        scenes=[_scene(1, beat="hook"), _scene(2, beat="main")],
+        subtitle_style=STYLE,
+    )
+    assert plan.scenes[0].motion == "punch_in"
+    joined = " ".join(_cmd(plan))
+    assert "0.08*on" not in joined  # tidak ada lagi zoom 8% lama
+    assert "if(lt(on,12),1+0.15*on/12,1.15)" in joined
+
+
+def test_command_twist_boundary_uses_slideleft():
+    plan = build_render_plan(
+        scenes=[_scene(1), _scene(2, beat="twist")],
+        subtitle_style=STYLE,
+    )
+    joined = " ".join(_cmd(plan))
+    assert "xfade=transition=slideleft:duration=0.3500" in joined
+
+
+def test_command_keyword_overlay_and_shake():
+    plan = build_render_plan(
+        scenes=[
+            _scene(1, beat="hook", sfx_cues=[{"sfx": "boom", "word": "satu"}]),
+            _scene(2, keyword_text="KATA"),
+        ],
+        subtitle_style=STYLE,
+    )
+    args = build_ffmpeg_command(
+        plan,
+        ass_path="/kerja/subtitles.ass",
+        fonts_dir="/app/assets/fonts",
+        output_path="/kerja/video.mp4",
+        video_encoder_args=ENCODER,
+        keyword_paths={1: "/kerja/kw-1.png"},
+    )
+    joined = " ".join(args)
+    assert "-loop" in joined
+    assert "/kerja/kw-1.png" in joined
+    assert "overlay=" in joined
+    assert "max(0,1-t/0.3)" in joined  # slide + fade-in keyword
+    assert "crop=1080:1920" in joined  # goyang kamera scene bercue
+    assert "sin(2*PI*18*t)" in joined
 
 
 def test_command_dips_narration_at_scene_cuts():
@@ -69,6 +132,6 @@ def test_command_crossfade_uses_xfade_and_tpad():
     )
     assert plan.scenes[1].transition_in == "crossfade"
     joined = " ".join(_cmd(plan))
-    assert "xfade=transition=fade:duration=0.2667" in joined
+    assert "xfade=transition=fade:duration=0.3500" in joined
     assert "tpad=start_mode=clone" in joined
     assert "tpad=stop_mode=clone" in joined

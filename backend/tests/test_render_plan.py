@@ -66,6 +66,11 @@ def test_motion_rules():
             _scene(2, visual_type="closeup"),
             _scene(3, visual_type="character"),
             _scene(4, visual_type="character"),
+            # Fase 13: beat hook/twist/impact selalu punch_in, apa pun
+            # visual_type-nya (termasuk diagram twist).
+            _scene(5, visual_type="character", beat="hook"),
+            _scene(6, visual_type="diagram", beat="twist"),
+            _scene(7, visual_type="environment", beat="impact"),
         ],
         subtitle_style=STYLE,
     )
@@ -74,6 +79,10 @@ def test_motion_rules():
     assert motions[1] == "punch_in"
     assert motions[2] in {"zoom_in", "zoom_out", "pan_left", "pan_right"}
     assert motions[3] != motions[2]  # anti-ulang tetangga
+    assert motions[4] == "punch_in"
+    assert motions[5] == "punch_in"
+    assert motions[6] == "punch_in"
+    assert [s.beat for s in plan.scenes[4:]] == ["hook", "twist", "impact"]
     again = build_render_plan(
         scenes=[
             _scene(1, visual_type="diagram"),
@@ -83,7 +92,7 @@ def test_motion_rules():
         ],
         subtitle_style=STYLE,
     )
-    assert [s.motion for s in again.scenes] == motions  # deterministik
+    assert [s.motion for s in again.scenes] == motions[:4]  # deterministik
 
 
 def test_chunk_words_rules():
@@ -102,7 +111,13 @@ def test_ass_and_srt_output():
     ass = build_ass(cues, STYLE)
     assert "PlayResX: 1080" in ass
     assert "MarginV: 580" in ass or ",580," in ass
-    assert "{\\c&H4DD8FF&\\fscx110\\fscy110}hebat{\\r}" in ass
+    # Fase 13 karaoke: tiap kata bertag \k<durasi_cs>; kata yang sudah
+    # terucap digambar Primary (kuning), yang belum Secondary (putih).
+    assert "{\\k30}cicak" in ass
+    assert "{\\k30}hebat" in ass
+    assert "&H0000FFFF,&H00FFFFFF," in ass
+    # Tag emphasis emas lama tidak lagi dipakai di mode karaoke.
+    assert "\\c&H" not in ass
     srt = build_srt(cues)
     assert "00:00:00,000 -->" in srt
     assert "cicak" in srt

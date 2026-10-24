@@ -83,9 +83,9 @@ def _probe_stream(path) -> str:
 
 
 async def test_run_render_mixed_chain_fade_after_cut(tmp_path):
-    """Regresi: crossfade SETELAH batas cut pernah gagal total karena basis
-    waktu keluaran concat (1/1000000) berbeda dari segmen zoompan, dan xfade
-    menolak kedua masukan yang basis waktunya tidak sama."""
+    """Fase 13: semua batas kini xfade (fade; slideleft masuk twist) —
+    regresi lama soal basis waktu concat vs xfade sudah pensiun bersama
+    concat, tapi tes ini tetap mengunci durasi total rantai campuran."""
     scenes = []
     transitions = ["cut", "cut", "crossfade", "cut"]
     for pos in range(1, 5):

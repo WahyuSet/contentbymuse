@@ -29,6 +29,8 @@ class SceneInput:
     voiceover: str = ""
     emphasis_words: list[str] = field(default_factory=list)
     sfx_cues: list[dict] = field(default_factory=list)
+    beat: str = ""
+    keyword_text: str | None = None
 
 
 @dataclass
@@ -42,6 +44,8 @@ class RenderScene:
     motion: str
     transition_in: str
     words: list[WordTiming]
+    beat: str = ""
+    keyword_text: str | None = None
 
 
 @dataclass
@@ -75,6 +79,10 @@ def _frame_round(t: float) -> float:
 
 
 def _pick_motion(scene: SceneInput, previous: str | None) -> str:
+    # Fase 13: beat hook/twist/impact selalu punch_in — momen penting harus
+    # terasa menghentak, bukan sekadar zoom pelan.
+    if scene.beat in ("hook", "twist", "impact"):
+        return "punch_in"
     if scene.visual_type == "diagram":
         return "static"
     if scene.visual_type == "closeup":
@@ -138,6 +146,8 @@ def build_render_plan(*, scenes: list[SceneInput], subtitle_style: dict) -> Rend
                 motion=motion,
                 transition_in=transition,
                 words=global_words,
+                beat=scene.beat,
+                keyword_text=scene.keyword_text,
             )
         )
         for cue in scene.sfx_cues or []:

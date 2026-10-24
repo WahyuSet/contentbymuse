@@ -202,18 +202,24 @@ def build_ass(cues: list[Cue], style: dict) -> str:
         "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
         "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"Style: Default,{style['font']},{size},&H00FFFFFF,&H000000FF,"
+        # Fase 13 karaoke: libass menggambar kata yang SUDAH terucap dengan
+        # PrimaryColour dan yang BELUM dengan SecondaryColour (terverifikasi
+        # dari frame prototipe) — jadi Primary=kuning, Secondary=putih
+        # supaya kata menyala kuning saat diucapkan. PlayRes di atas WAJIB:
+        # tanpanya libass tidak menggambar subtitle sama sekali.
+        f"Style: Default,{style['font']},{size},&H0000FFFF,&H00FFFFFF,"
         f"&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,{outline},0,2,10,10,"
         f"{margin_v},1\n\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
         "Effect, Text\n"
     )
-    open_tag, close_tag = _emphasis_tags(style)
     lines = [header]
     for cue in cues:
-        # Susun ulang teks dari kata agar tag emphasis menempel per kata,
-        # mengikuti jeda baris hasil wrap.
+        # Karaoke per kata: tag \k<durasi_cs> sebelum tiap kata. Tag emphasis
+        # emas lama dihapus di mode karaoke — highlight kuning per kata yang
+        # terucap menggantikan fungsinya (menggabungkan \c dan \k membuat
+        # pewarnaan tak terprediksi).
         rendered_lines: list[str] = []
         index = 0
         for line in cue.lines:
@@ -221,8 +227,9 @@ def build_ass(cues: list[Cue], style: dict) -> str:
             for _ in line.split():
                 item = cue.words[index]
                 index += 1
+                dur = max(1, round((item.end - item.start) * 100))
                 text = _ass_escape(item.word)
-                parts.append(f"{open_tag}{text}{close_tag}" if item.emphasis else text)
+                parts.append(f"{{\\k{dur}}}{text}")
             rendered_lines.append(" ".join(parts))
         text = "\\N".join(rendered_lines)
         lines.append(

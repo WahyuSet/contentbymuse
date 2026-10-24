@@ -15,7 +15,6 @@ from app.services.ffmpeg_render import run_render
 from app.services.render_plan import SceneInput, WordTiming, build_render_plan
 from app.services.render_settings import get_subtitle_style
 from app.services.subtitles import proportional_words
-from app.services.thumbnail_text import draw_keyword_text
 from app.storage.local import LocalStorage
 
 
@@ -31,6 +30,9 @@ async def _selected(session: AsyncSession, scene_id: str, kind: str) -> Asset | 
     ).scalar_one_or_none()
 
 
+RENDER_GRAPH_VERSION = "fase-13"
+
+
 async def render_hash_parts(
     session: AsyncSession, project: Project, script: Script, style: dict
 ) -> tuple[dict, list[tuple[Scene, Asset, Asset, Asset | None]]]:
@@ -39,8 +41,15 @@ async def render_hash_parts(
             select(Scene).where(Scene.script_id == script.id).order_by(Scene.position)
         )
     ).scalars().all()
+    # Fase 13: versi graf render — perubahan level kode (bukan style dict)
+    # tidak mengubah digest lama, jadi versi ini menginvalidasi cache render
+    # lama sekali jalan saat proyek di-render ulang.
     per_scene = []
-    parts: dict = {"style": style, "scenes": []}
+    parts: dict = {
+        "style": style,
+        "graph_version": RENDER_GRAPH_VERSION,
+        "scenes": [],
+    }
     for scene in scenes:
         voice = await _selected(session, scene.id, "voice_clip")
         image = await _selected(session, scene.id, "image")
@@ -51,6 +60,7 @@ async def render_hash_parts(
                 "scene_id": scene.id,
                 "revision": scene.revision,
                 "visual_type": scene.visual_type,
+                "beat": scene.beat,
                 "transition": scene.transition,
                 "subtitle_override": scene.subtitle_override,
                 "emphasis_words": scene.emphasis_words,
@@ -112,7 +122,6 @@ async def run_render_job(
                     await session.commit()
                 return {"asset_id": existing.id, "cached": True}
 
-        keyword_dir = Path(tempfile.mkdtemp(prefix="keyword-"))
         scene_inputs: list[SceneInput] = []
         for scene, voice, image, timings in per_scene:
             trim = None
@@ -137,15 +146,6 @@ async def run_render_job(
                 end = trim[1] if trim else float(voice.duration_s or 0.0)
                 words = proportional_words(scene.voiceover, start, end)
             image_path = await storage.local_path(image.storage_key)
-            if scene.keyword_text:
-                # Teks kata kunci di-composite lokal SEBELUM ffmpeg; plan
-                # dan perintah ffmpeg tidak berubah bentuk.
-                composited = draw_keyword_text(
-                    image_path.read_bytes(), scene.keyword_text
-                )
-                keyword_path = keyword_dir / f"scene-{scene.position}.png"
-                keyword_path.write_bytes(composited)
-                image_path = keyword_path
             scene_inputs.append(
                 SceneInput(
                     id=scene.id,
@@ -161,6 +161,11 @@ async def run_render_job(
                     voiceover=scene.voiceover,
                     emphasis_words=list(scene.emphasis_words or []),
                     sfx_cues=list(scene.sfx_cues or []),
+                    beat=scene.beat or "",
+                    # Fase 13: keyword TIDAK lagi ditempel ke gambar di sini —
+                    # run_render menulis PNG overlay transparan dan ffmpeg
+                    # menganimasikannya (slide + fade-in) tiap awal scene.
+                    keyword_text=scene.keyword_text,
                 )
             )
 

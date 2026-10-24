@@ -62,6 +62,29 @@ def test_draw_keyword_text_long_text_shrinks_to_fit():
     assert result.size == (1080, 1920)
 
 
+def test_draw_keyword_overlay_is_transparent_except_top_band():
+    from app.services.thumbnail_text import draw_keyword_overlay
+
+    out = draw_keyword_overlay("MSCI")
+    result = Image.open(io.BytesIO(out))
+    assert result.size == (1080, 1920)
+    assert result.mode == "RGBA"
+    alpha = result.getchannel("A")
+    # Pita atas berisi teks (ada piksel tak transparan).
+    assert alpha.crop((0, 100, 1080, 300)).getextrema()[1] > 0
+    # Setengah bawah sepenuhnya transparan.
+    assert alpha.crop((0, 960, 1080, 1920)).getextrema() == (0, 0)
+    # Normalisasi huruf besar sama seperti draw_keyword_text.
+    assert draw_keyword_overlay("msci") == out
+
+
+def test_draw_keyword_overlay_empty_is_fully_transparent():
+    from app.services.thumbnail_text import draw_keyword_overlay
+
+    result = Image.open(io.BytesIO(draw_keyword_overlay("")))
+    assert result.getchannel("A").getextrema() == (0, 0)
+
+
 @pytest.fixture
 async def hash_world(tmp_path):
     engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path}/hash.db")
@@ -100,10 +123,21 @@ async def test_render_hash_parts_includes_keyword_text(hash_world):
     assert parts["scenes"][0]["keyword_text"] == "MSCI"
 
 
+async def test_render_hash_parts_includes_graph_version(hash_world):
+    from app.jobs.render import RENDER_GRAPH_VERSION
+
+    factory, (project_id, script_id, _scene_id) = hash_world
+    async with factory() as session:
+        project = await session.get(Project, project_id)
+        script = await session.get(Script, script_id)
+        parts, _per_scene = await render_hash_parts(session, project, script, {})
+    assert parts["graph_version"] == RENDER_GRAPH_VERSION == "fase-13"
+
+
 async def test_render_job_composites_keyword_before_ffmpeg(tmp_path, monkeypatch):
-    """run_render_job: scene ber-keyword_text masuk plan dengan image_path
-    file komposit di direktori keyword-*; isi file-nya PNG yang pita
-    atasnya sudah berubah."""
+    """Fase 13: run_render_job TIDAK lagi mengomposit keyword ke gambar —
+    plan membawa image mentah + keyword_text, dan overlay animasi dibuat
+    run_render/ffmpeg (bukan di job render)."""
     from pathlib import Path
 
     import app.jobs.render as render_job
@@ -167,6 +201,8 @@ async def test_render_job_composites_keyword_before_ffmpeg(tmp_path, monkeypatch
         async def fake_run_render(plan, *, workdir, **kwargs):
             captured["image_path"] = plan.scenes[0].image_path
             captured["image_bytes"] = Path(plan.scenes[0].image_path).read_bytes()
+            captured["keyword_text"] = plan.scenes[0].keyword_text
+            captured["beat"] = plan.scenes[0].beat
             video = workdir / "video.mp4"
             video.write_bytes(b"\x00" * 2048)
             (workdir / "subtitles.srt").write_text("1\n", encoding="utf-8")
@@ -193,14 +229,11 @@ async def test_render_job_composites_keyword_before_ffmpeg(tmp_path, monkeypatch
     finally:
         await engine.dispose()
 
-    assert captured["image_path"].endswith("scene-1.png")
-    assert "keyword-" in captured["image_path"]
-    composited = Image.open(io.BytesIO(captured["image_bytes"]))
-    assert composited.size == (1080, 1920)
-    original = Image.open(io.BytesIO(source_png))
-    assert composited.crop((0, 100, 1080, 300)).tobytes() != original.crop(
-        (0, 100, 1080, 300)
-    ).tobytes()
+    assert captured["image_path"].endswith("image.png")
+    assert "keyword-" not in captured["image_path"]
+    assert captured["keyword_text"] == "MSCI"
+    # Gambar mentah tidak disentuh job render (overlay dibuat ffmpeg).
+    assert captured["image_bytes"] == source_png
 
 
 async def test_render_hash_changes_when_keyword_text_changes(hash_world):

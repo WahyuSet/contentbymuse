@@ -109,6 +109,16 @@ async def run_render(
     ass_path.write_text(build_ass(plan.cues, plan.subtitle_style), encoding="utf-8")
     srt_path.write_text(build_srt(plan.cues), encoding="utf-8")
 
+    # Fase 13: PNG keyword transparan per scene untuk overlay animasi.
+    from app.services.thumbnail_text import draw_keyword_overlay
+
+    keyword_paths: dict[int, str] = {}
+    for i, scene in enumerate(plan.scenes):
+        if scene.keyword_text:
+            kw_path = workdir / f"keyword-{i}.png"
+            kw_path.write_bytes(draw_keyword_overlay(scene.keyword_text))
+            keyword_paths[i] = str(kw_path)
+
     timeout_s = max(600.0, plan.total_duration_s * 120)
     encoder_name, encoder_args = detect_encoder(ffmpeg)
     args = build_ffmpeg_command(
@@ -117,6 +127,7 @@ async def run_render(
         fonts_dir=str(FONTS_DIR),
         output_path=str(video_path),
         video_encoder_args=encoder_args,
+        keyword_paths=keyword_paths,
     )
     args[2:2] = ["-progress", "pipe:1", "-nostats"]
     started = time.monotonic()
