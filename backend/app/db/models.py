@@ -25,6 +25,12 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def default_voice_settings() -> dict:
+    # Bawaan channel (keputusan pemilik 2026-10-24, tes dengar): narator Aria
+    # dibacakan pada speed 110. Project boleh menimpanya lewat PATCH.
+    return {"speed": 110}
+
+
 class Base(DeclarativeBase):
     pass
 
@@ -212,7 +218,7 @@ class Project(Base):
     active_script_id: Mapped[str | None] = mapped_column(String(26))
     voice_provider_id: Mapped[str | None] = mapped_column(String(26))
     voice_id: Mapped[str | None] = mapped_column(String(128))
-    voice_settings: Mapped[dict] = mapped_column(JSON, default=dict)
+    voice_settings: Mapped[dict] = mapped_column(JSON, default=default_voice_settings)
     image_provider_id: Mapped[str | None] = mapped_column(String(26))
     visual_style_id: Mapped[str | None] = mapped_column(String(26))
     settings: Mapped[dict] = mapped_column(JSON, default=dict)

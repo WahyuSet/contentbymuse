@@ -90,3 +90,12 @@ async def test_project_voice_columns(session):
     await session.commit()
     assert project.voice_settings == {"speed": 110}
     assert project.voice_provider_id is None
+
+
+async def test_project_voice_settings_default_speed_110(session):
+    # Bawaan channel: project tanpa voice_settings eksplisit memakai speed 110
+    # (keputusan pemilik 2026-10-24); nilai eksplisit tetap menang.
+    project = Project(title="Cicak", topic="cicak")
+    session.add(project)
+    await session.commit()
+    assert project.voice_settings == {"speed": 110}
